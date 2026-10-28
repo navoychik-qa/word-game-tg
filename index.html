@@ -18,8 +18,9 @@
             --success: #4CAF50;
             --gold: #FFD700;
             --locked-bg: #2c3947;
-            --tile-bg: #e2b714; /* Цвет плиток с буквами */
+            --tile-bg: #e2b714;
             --tile-text: #17212b;
+            --tile-used: #3b4a5a;
         }
 
         [data-theme="light"] {
@@ -35,6 +36,7 @@
             --locked-bg: #e0e0e0;
             --tile-bg: #f0d470;
             --tile-text: #000000;
+            --tile-used: #cccccc;
         }
 
         body {
@@ -87,32 +89,19 @@
         .level-btn.current { border: 2px solid var(--gold); }
 
         /* Игра */
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0; }
         .back-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); padding: 0; }
         .level-info { font-size: 18px; font-weight: bold; }
         .bonus-badge { color: var(--gold); font-weight: bold; font-size: 16px; }
 
         .task-card {
             background-color: var(--secondary-bg); padding: 15px; border-radius: 16px;
-            text-align: center; margin-bottom: 10px; border: 1px solid rgba(128,128,128,0.2);
+            text-align: center; margin-bottom: 10px; border: 1px solid rgba(128,128,128,0.2); flex-shrink: 0;
         }
         .task-title { font-size: 14px; color: var(--hint); margin-bottom: 5px; text-transform: uppercase; }
         .task-word { font-size: 20px; font-weight: bold; color: var(--btn); }
 
-        /* Плитки с буквами для Главы 2 */
-        .letters-pool {
-            display: none; flex-wrap: wrap; gap: 6px; justify-content: center;
-            margin-bottom: 15px; padding: 10px; background: var(--secondary-bg); border-radius: 12px;
-        }
-        .letter-tile {
-            background: var(--tile-bg); color: var(--tile-text);
-            font-size: 18px; font-weight: bold; padding: 8px 12px; border-radius: 8px;
-            cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.2); user-select: none;
-            text-transform: uppercase; transition: transform 0.1s;
-        }
-        .letter-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
-
-        .action-buttons { display: flex; gap: 10px; margin-bottom: 10px; }
+        .action-buttons { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
         .action-btn {
             flex: 1; background: rgba(212, 175, 55, 0.1); color: var(--gold);
             border: 1px solid var(--gold); border-radius: 8px; padding: 8px;
@@ -120,7 +109,8 @@
         }
         .action-btn span { font-size: 10px; opacity: 0.8; }
 
-        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        /* Ввод для Главы 1 */
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
         input {
             flex: 1; padding: 16px; border-radius: 12px; border: 1px solid var(--hint);
             background-color: var(--secondary-bg); color: var(--text); font-size: 16px; outline: none;
@@ -131,14 +121,44 @@
             padding: 0 20px; border-radius: 12px; font-size: 24px; font-weight: bold; cursor: pointer;
         }
 
-        .words-list { flex: 1; overflow-y: auto; padding-bottom: 10px; }
+        /* Конструктор для Главы 2 */
+        .tiles-container {
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            flex: 1; margin-bottom: 10px;
+        }
+        .current-word-display {
+            font-size: 36px; font-weight: bold; letter-spacing: 2px; min-height: 45px;
+            color: var(--btn); margin-bottom: 20px; text-transform: uppercase;
+            border-bottom: 2px dashed var(--hint); padding-bottom: 5px; min-width: 50px; text-align: center;
+        }
+        .letters-pool {
+            display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px;
+        }
+        .letter-tile {
+            width: 55px; height: 55px; border-radius: 12px;
+            background: var(--tile-bg); color: var(--tile-text);
+            font-size: 26px; font-weight: bold; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.2); user-select: none;
+            text-transform: uppercase; transition: all 0.1s;
+        }
+        .letter-tile:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+        .letter-tile.used { background: var(--tile-used); color: var(--hint); box-shadow: none; transform: translateY(4px); cursor: default; }
+        
+        .tile-controls { display: flex; gap: 15px; width: 100%; justify-content: center; }
+        .tile-btn {
+            padding: 12px 24px; border-radius: 12px; font-size: 18px; font-weight: bold; border: none; cursor: pointer;
+        }
+        .tile-btn.backspace { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
+        .tile-btn.submit { background: var(--success); color: white; flex: 1; max-width: 200px; }
+
+        .words-list { flex: 1; overflow-y: auto; padding-bottom: 10px; min-height: 50px; }
         .word-item {
             background-color: var(--secondary-bg); padding: 10px 15px; border-radius: 8px;
             margin-bottom: 8px; font-size: 16px; display: flex; justify-content: space-between;
             animation: slideIn 0.2s ease-out; border-left: 4px solid var(--success);
         }
         .word-item span:last-child { color: var(--success); font-weight: bold; }
-        .progress { font-size: 16px; font-weight: bold; color: var(--btn); text-align: center; margin-top: 10px; }
+        .progress { font-size: 16px; font-weight: bold; color: var(--btn); text-align: center; margin-top: 10px; flex-shrink: 0; }
 
         /* Загрузка */
         #loading-screen {
@@ -187,7 +207,6 @@
             <div class="bonus-badge">🪙 <span id="levels-balance">0</span></div>
         </div>
         
-        <!-- Вкладки глав -->
         <div class="tabs">
             <div class="tab active" id="tab-ch1" onclick="switchChapter(1)">Глава 1</div>
             <div class="tab" id="tab-ch2" onclick="switchChapter(2)">Глава 2</div>
@@ -209,17 +228,25 @@
             <div class="task-word" id="current-task">Загрузка...</div>
         </div>
 
-        <!-- Поле для букв (появится только во 2 главе) -->
-        <div class="letters-pool" id="letters-pool"></div>
-
         <div class="action-buttons">
             <button class="action-btn" onclick="changeLetter()">Сменить букву <span>(10 🪙)</span></button>
             <button class="action-btn" onclick="changeCondition()">Сменить условие <span>(15 🪙)</span></button>
         </div>
 
-        <div class="input-group">
+        <!-- Ввод с клавиатуры (Глава 1) -->
+        <div class="input-group" id="keyboard-input-group">
             <input type="text" id="word-input" placeholder="Введи слово..." autocomplete="off">
             <button class="submit-btn" onclick="checkWord()">→</button>
+        </div>
+
+        <!-- Конструктор из букв (Глава 2) -->
+        <div class="tiles-container" id="tiles-container">
+            <div class="current-word-display" id="current-word-display"></div>
+            <div class="letters-pool" id="letters-pool"></div>
+            <div class="tile-controls">
+                <button class="tile-btn backspace" onclick="backspaceTile()">⌫</button>
+                <button class="tile-btn submit" onclick="submitTileWord()">Проверить</button>
+            </div>
         </div>
 
         <div class="words-list" id="words-container"></div>
@@ -259,7 +286,10 @@
         let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
         let currentLevelIndex = 1;
         let bonusBalance = parseInt(localStorage.getItem('wordBattleBonus') || '50');
-        let currentChapterView = 1; // Какая глава сейчас открыта в меню
+        let currentChapterView = 1;
+
+        let currentWord = "";
+        let selectedTileElements = [];
 
         const TOTAL_LEVELS = 100;
         const allLevels = [];
@@ -291,7 +321,6 @@
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
             
-            // Глава 1: 1-50 уровни (условия)
             for (let i = 1; i <= 50; i++) {
                 let type, val, text, target;
                 if (i <= 10) {
@@ -313,37 +342,23 @@
                 allLevels.push({ type, val, text, target });
             }
 
-            // Глава 2: 51-100 уровни (из букв)
             const vowels = 'аеиоуыэюя';
             const consonants = 'бвгджзклмнпрстфхцчшщ';
             
             for (let i = 51; i <= 100; i++) {
                 const idx = i - 51;
-                // Количество букв растет: 8, 9, 10, 11, 12
                 const letterCount = 8 + Math.floor(idx / 10); 
-                // Целевое количество слов: 3, 4, 5
                 const target = 3 + Math.floor(idx / 17);
                 
-                // Генерируем пул букв: 40% гласных, 60% согласных
                 let pool = [];
-                const seed = i * 13; // Псевдослучайный сид для консистентности
+                const seed = i * 13;
                 for (let j = 0; j < letterCount; j++) {
-                    if ((seed + j) % 10 < 4) {
-                        pool.push(vowels[(seed + j) % vowels.length]);
-                    } else {
-                        pool.push(consonants[(seed * 2 + j) % consonants.length]);
-                    }
+                    if ((seed + j) % 10 < 4) { pool.push(vowels[(seed + j) % vowels.length]); } 
+                    else { pool.push(consonants[(seed * 2 + j) % consonants.length]); }
                 }
-                
-                // Перемешиваем буквы
                 pool.sort(() => Math.random() - 0.5);
 
-                allLevels.push({ 
-                    type: 'letters', 
-                    val: pool, 
-                    text: `Составь слова из ${letterCount} букв`, 
-                    target: target 
-                });
+                allLevels.push({ type: 'letters', val: pool, text: `Составь слова из ${letterCount} букв`, target: target });
             }
         }
         generateLevels();
@@ -468,8 +483,6 @@
         function renderLevelGrid() {
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
-
-            // Определяем диапазон уровней для отрисовки
             const start = currentChapterView === 1 ? 1 : 51;
             const end = currentChapterView === 1 ? 50 : 100;
 
@@ -478,20 +491,12 @@
                 btn.className = 'level-btn';
                 btn.innerText = i;
 
-                if (i < maxUnlockedLevel) {
-                    btn.classList.add('completed');
-                } else if (i === maxUnlockedLevel) {
-                    btn.classList.add('current'); 
-                } else {
-                    btn.classList.add('locked');
-                    btn.innerHTML = '🔒';
-                }
+                if (i < maxUnlockedLevel) { btn.classList.add('completed'); }
+                else if (i === maxUnlockedLevel) { btn.classList.add('current'); }
+                else { btn.classList.add('locked'); btn.innerHTML = '🔒'; }
 
-                if (i <= maxUnlockedLevel) {
-                    btn.onclick = () => startLevel(i);
-                } else {
-                    btn.onclick = () => tg.showAlert('Сначала пройди предыдущие уровни!');
-                }
+                if (i <= maxUnlockedLevel) { btn.onclick = () => startLevel(i); }
+                else { btn.onclick = () => tg.showAlert('Сначала пройди предыдущие уровни!'); }
 
                 grid.appendChild(btn);
             }
@@ -506,7 +511,7 @@
         }
 
         function confirmLeaveLevel() {
-            if (enteredWords.length === 0) {
+            if (enteredWords.length === 0 && currentWord === "") {
                 showLevelSelect();
                 return;
             }
@@ -524,41 +529,69 @@
 
         function loadLevel() {
             enteredWords = [];
+            currentWord = "";
+            selectedTileElements = [];
             document.getElementById('words-container').innerHTML = '';
             document.getElementById('word-input').value = '';
+            document.getElementById('current-word-display').innerText = '';
 
             const level = allLevels[currentLevelIndex - 1];
-            
             document.getElementById('level-display').innerText = `Уровень ${currentLevelIndex}`;
             document.getElementById('current-task').innerText = level.text;
 
             const poolContainer = document.getElementById('letters-pool');
             const taskTitle = document.getElementById('task-title-text');
+            const keyboardGroup = document.getElementById('keyboard-input-group');
+            const tilesContainer = document.getElementById('tiles-container');
 
-            // Если это глава 2 (составление из букв)
             if (level.type === 'letters') {
-                taskTitle.innerText = "Твои буквы (нажми, чтобы вставить):";
-                poolContainer.style.display = 'flex';
+                taskTitle.innerText = "Составь слово из букв:";
+                keyboardGroup.style.display = 'none';
+                tilesContainer.style.display = 'flex';
                 poolContainer.innerHTML = '';
                 
-                level.val.forEach(letter => {
+                level.val.forEach((letter, index) => {
                     const tile = document.createElement('div');
                     tile.className = 'letter-tile';
                     tile.innerText = letter;
-                    // Добавление буквы в инпут по клику
-                    tile.onclick = () => {
-                        const input = document.getElementById('word-input');
-                        input.value += letter;
-                        tg.HapticFeedback.impactOccurred('light');
-                    };
+                    tile.onclick = () => clickTile(tile, letter);
                     poolContainer.appendChild(tile);
                 });
             } else {
                 taskTitle.innerText = "Твоё задание:";
-                poolContainer.style.display = 'none';
+                keyboardGroup.style.display = 'flex';
+                tilesContainer.style.display = 'none';
             }
 
             updateProgress();
+        }
+
+        // --- ЛОГИКА КЛИКА ПО ПЛИТКАМ (ГЛАВА 2) ---
+        function clickTile(tileEl, letter) {
+            if (tileEl.classList.contains('used')) return;
+
+            currentWord += letter;
+            tileEl.classList.add('used');
+            selectedTileElements.push(tileEl);
+
+            document.getElementById('current-word-display').innerText = currentWord;
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function backspaceTile() {
+            if (selectedTileElements.length === 0) return;
+
+            const lastTile = selectedTileElements.pop();
+            lastTile.classList.remove('used');
+            currentWord = currentWord.slice(0, -1);
+            
+            document.getElementById('current-word-display').innerText = currentWord;
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function submitTileWord() {
+            if (!currentWord) return;
+            checkWord(currentWord, true);
         }
 
         function updateProgress() {
@@ -574,10 +607,9 @@
             
             const level = allLevels[currentLevelIndex - 1];
             if (level.type === 'letters') {
-                // Меняем одну случайную букву в пуле на выбранную
                 const randomIndex = Math.floor(Math.random() * level.val.length);
                 level.val[randomIndex] = newLetter.toLowerCase();
-                loadLevel(); // Перерисовываем плитки
+                loadLevel(); // Перерисовываем
             } else {
                 level.type = 'startsWith';
                 level.val = newLetter.toLowerCase();
@@ -593,26 +625,16 @@
 
         function changeCondition() {
             if (bonusBalance < 15) return tg.showAlert('Недостаточно бонусов!');
-            tg.showAlert('В главе 2 нельзя менять условие, так как слова собираются из букв!');
-            return;
-            // Для главы 1 логика остается
+            const level = allLevels[currentLevelIndex - 1];
+            if (level.type === 'letters') return tg.showAlert('В главе 2 нельзя менять условие!');
+            
+            // Логика для 1 главы...
         }
 
         // --- ВАЛИДАЦИЯ СЛОВ ---
-        // Проверяет, можно ли составить слово из выданных букв
-        function canFormFromLetters(word, letters) {
-            const poolCount = {};
-            for (let char of letters) poolCount[char] = (poolCount[char] || 0) + 1;
-            for (let char of word) {
-                if (!poolCount[char]) return false; // Если буквы нет в пуле
-                poolCount[char]--;
-            }
-            return true;
-        }
-
-        function checkWord() {
+        function checkWord(wordStr = null, isTileMode = false) {
             const input = document.getElementById('word-input');
-            const rawWord = input.value.trim();
+            let rawWord = isTileMode ? wordStr : input.value.trim();
             const word = normalizeWord(rawWord);
 
             if (!word) return;
@@ -630,18 +652,10 @@
             }
 
             const level = allLevels[currentLevelIndex - 1];
-            let isValid = false;
-
-            if (level.type === 'letters') {
-                // Проверка для главы 2
-                isValid = canFormFromLetters(word, level.val);
-                if (!isValid) {
-                    tg.HapticFeedback.notificationOccurred('error');
-                    tg.showAlert('В слове есть буквы, которых нет в наборе, или они использованы слишком много раз!');
-                    return;
-                }
-            } else {
-                // Проверка для главы 1
+            
+            // Проверка для главы 2 (уже собрано из плиток, так что валидация букв пройдена)
+            if (level.type !== 'letters') {
+                let isValid = false;
                 if (level.type === 'startsWith') isValid = word.startsWith(level.val);
                 else if (level.type === 'endsWith') isValid = word.endsWith(level.val);
                 else if (level.type === 'contains') isValid = word.includes(level.val);
@@ -663,7 +677,16 @@
             // Успех
             tg.HapticFeedback.notificationOccurred('success');
             enteredWords.push(word);
-            input.value = ''; 
+            
+            if (isTileMode) {
+                // Очищаем конструктор
+                currentWord = "";
+                selectedTileElements.forEach(el => el.classList.remove('used'));
+                selectedTileElements = [];
+                document.getElementById('current-word-display').innerText = '';
+            } else {
+                input.value = ''; 
+            }
             
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
@@ -695,8 +718,9 @@
             }
         }
 
+        // Слушатель для 1 главы
         document.getElementById('word-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') checkWord();
+            if (e.key === 'Enter') checkWord(null, false);
         });
     </script>
 </body>
