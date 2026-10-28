@@ -139,7 +139,7 @@
         async function loadDictionary() {
             try {
                 // Скачиваем файл words.txt
-                const response = await fetch('words.txt');
+                const response = await fetch('words.txt.gz');
                 if (!response.ok) throw new Error('Файл не найден');
                 
                 const text = await response.text();
@@ -160,7 +160,7 @@
 
             } catch (error) {
                 console.error(error);
-                tg.showAlert('Ошибка загрузки словаря. Проверьте, что words.txt загружен на GitHub.');
+                tg.showAlert('Ошибка загрузки словаря. Проверьте, что words.txt.gz загружен на GitHub.');
                 document.getElementById('loading-screen').innerHTML = '<div style="color:red">Ошибка загрузки словаря</div>';
             }
         }
