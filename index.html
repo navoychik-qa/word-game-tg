@@ -7,65 +7,85 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --bg: var(--tg-theme-bg-color, #ffffff);
-            --text: var(--tg-theme-text-color, #000000);
-            --hint: var(--tg-theme-hint-color, #999999);
-            --btn: var(--tg-theme-button-color, #2481cc);
+            --bg: var(--tg-theme-bg-color, #17212b);
+            --text: var(--tg-theme-text-color, #ffffff);
+            --hint: var(--tg-theme-hint-color, #7f91a4);
+            --btn: var(--tg-theme-button-color, #5288c1);
             --btn-text: var(--tg-theme-button-text-color, #ffffff);
-            --secondary-bg: var(--tg-theme-secondary-bg-color, #f1f1f1);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #232e3c);
+            --danger: #e53935;
+            --success: #4CAF50;
+            --gold: #FFD700;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: var(--bg); color: var(--text);
-            margin: 0; padding: 20px; display: flex; flex-direction: column;
-            align-items: center; height: 100vh; box-sizing: border-box;
+            margin: 0; padding: 15px; display: flex; flex-direction: column;
+            align-items: center; height: 100vh; box-sizing: border-box; overflow: hidden;
         }
+        
+        /* Экраны */
         .screen { display: none; width: 100%; max-width: 400px; flex-direction: column; height: 100%; }
         .screen.active { display: flex; }
 
-        .menu-title { font-size: 32px; font-weight: bold; text-align: center; margin-top: 40px; margin-bottom: 40px; }
+        /* Меню */
+        .menu-title { font-size: 32px; font-weight: bold; text-align: center; margin-top: 20px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .balance { font-size: 18px; color: var(--gold); text-align: center; margin-bottom: 30px; font-weight: bold; }
         .btn {
             background-color: var(--btn); color: var(--btn-text);
             border: none; padding: 16px; border-radius: 12px;
-            font-size: 18px; font-weight: 600; margin-bottom: 16px; cursor: pointer;
+            font-size: 18px; font-weight: 600; margin-bottom: 12px; cursor: pointer;
+            transition: transform 0.1s;
         }
-        .btn:disabled { opacity: 0.5; background-color: var(--hint); }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; background-color: var(--hint); cursor: not-allowed; }
+        .btn-secondary { background-color: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
+        .btn-pvp { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
 
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .back-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); }
+        /* Игра */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .back-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); padding: 0; }
         .level-info { font-size: 18px; font-weight: bold; }
+        .bonus-badge { color: var(--gold); font-weight: bold; font-size: 16px; }
 
         .task-card {
-            background-color: var(--secondary-bg); padding: 20px; border-radius: 16px;
-            text-align: center; margin-bottom: 20px;
+            background-color: var(--secondary-bg); padding: 15px; border-radius: 16px;
+            text-align: center; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
         }
-        .task-title { font-size: 16px; color: var(--hint); margin-bottom: 8px; }
-        .task-word { font-size: 22px; font-weight: bold; color: var(--btn); }
+        .task-title { font-size: 14px; color: var(--hint); margin-bottom: 5px; text-transform: uppercase; }
+        .task-word { font-size: 20px; font-weight: bold; color: var(--btn); }
 
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .action-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
+        .action-btn {
+            flex: 1; background: rgba(255, 215, 0, 0.1); color: var(--gold);
+            border: 1px solid var(--gold); border-radius: 8px; padding: 8px;
+            font-size: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+        }
+        .action-btn span { font-size: 10px; opacity: 0.8; }
+        .action-btn:active { background: rgba(255, 215, 0, 0.2); }
+
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
         input {
             flex: 1; padding: 16px; border-radius: 12px; border: 1px solid var(--hint);
-            background-color: var(--bg); color: var(--text); font-size: 16px; outline: none;
+            background-color: var(--secondary-bg); color: var(--text); font-size: 16px; outline: none;
         }
+        input:focus { border-color: var(--btn); }
         .submit-btn {
             background-color: var(--btn); color: var(--btn-text); border: none;
-            padding: 0 20px; border-radius: 12px; font-size: 20px; font-weight: bold; cursor: pointer;
+            padding: 0 20px; border-radius: 12px; font-size: 24px; font-weight: bold; cursor: pointer;
         }
 
-        .words-list { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+        .words-list { flex: 1; overflow-y: auto; padding-bottom: 10px; }
         .word-item {
-            background-color: var(--secondary-bg); padding: 12px 16px; border-radius: 8px;
+            background-color: var(--secondary-bg); padding: 10px 15px; border-radius: 8px;
             margin-bottom: 8px; font-size: 16px; display: flex; justify-content: space-between;
-            animation: slideIn 0.2s ease-out;
+            animation: slideIn 0.2s ease-out; border-left: 4px solid var(--success);
         }
-        .word-item span:last-child { color: #4CAF50; font-weight: bold; }
+        .word-item span:last-child { color: var(--success); font-weight: bold; }
         .progress { font-size: 16px; font-weight: bold; color: var(--btn); text-align: center; margin-top: 10px; }
 
-        @keyframes slideIn {
-            from { transform: translateY(-10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
+        /* Загрузка */
         #loading-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg); display: flex; justify-content: center; align-items: center;
@@ -76,7 +96,23 @@
             border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
             margin-bottom: 16px;
         }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-10px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Заглушка для PvP экрана */
+        .pvp-mockup {
+            flex: 1; display: flex; flex-direction: column; justify-content: space-between;
+            background: linear-gradient(180deg, #2b1055 0%, #7597de 100%);
+            border-radius: 16px; padding: 20px; text-align: center; color: white;
+        }
+        .pvp-header { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .pvp-timer { font-size: 32px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; margin: 0 auto 10px auto; width: fit-content; }
+        .pvp-abilities { display: flex; gap: 5px; justify-content: center; margin-bottom: 10px; }
+        .pvp-ability { width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; border: 2px solid white; }
     </style>
 </head>
 <body>
@@ -86,22 +122,32 @@
         <div id="loading-text">Загрузка словаря...</div>
     </div>
 
+    <!-- ЭКРАН 1: Меню -->
     <div id="screen-menu" class="screen active">
         <div class="menu-title">Word Battle</div>
+        <div class="balance">🪙 <span id="menu-balance">0</span> бонусов</div>
+        
         <button id="btn-start" class="btn" onclick="startGame()" disabled>Загрузка...</button>
-        <button class="btn" onclick="tg.showAlert('Соревновательный режим в разработке!')">Один на один</button>
+        <button class="btn btn-pvp" onclick="showPvpMockup()">⚔️ Один на один (PvP)</button>
+        <button class="btn btn-secondary" onclick="tg.showAlert('Рейтинг и турниры в разработке!')">🏆 Рейтинг игроков</button>
     </div>
 
+    <!-- ЭКРАН 2: Игра Одиночная -->
     <div id="screen-game" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
             <div class="level-info" id="level-display">Уровень 1</div>
-            <div style="width: 24px;"></div>
+            <div class="bonus-badge">🪙 <span id="game-balance">0</span></div>
         </div>
 
         <div class="task-card">
             <div class="task-title">Твоё задание:</div>
             <div class="task-word" id="current-task">Загрузка...</div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="action-btn" onclick="changeLetter()">Сменить букву <span>(10 🪙)</span></button>
+            <button class="action-btn" onclick="changeCondition()">Сменить условие <span>(15 🪙)</span></button>
         </div>
 
         <div class="input-group">
@@ -113,107 +159,124 @@
         <div class="progress" id="progress-text">Введено: 0 / 0</div>
     </div>
 
+    <!-- ЭКРАН 3: PvP Заглушка (Визуализация вашей задумки) -->
+    <div id="screen-pvp" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="goToMenu()">←</button>
+            <div class="level-info">Битва 1 на 1</div>
+            <div style="width: 24px;"></div>
+        </div>
+        
+        <div class="pvp-mockup">
+            <div>
+                <div>👤 Враг: Player2</div>
+                <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">Счет: 4</div>
+                <div style="height: 80px; background: rgba(0,0,0,0.3); border-radius: 8px; display: flex; justify-content: center; align-items: center;">[Скин врага]</div>
+            </div>
+            
+            <div class="pvp-timer">00:15</div>
+            
+            <div>
+                <div class="pvp-abilities">
+                    <div class="pvp-ability">🔄</div>
+                    <div class="pvp-ability">📝</div>
+                    <div class="pvp-ability">🥷</div>
+                    <div class="pvp-ability">🗑️</div>
+                </div>
+                <div class="input-group" style="margin-bottom: 5px;">
+                    <input type="text" placeholder="Введи слово..." disabled>
+                    <button class="submit-btn" disabled>→</button>
+                </div>
+                <div style="height: 80px; background: rgba(0,0,0,0.3); border-radius: 8px; display: flex; justify-content: center; align-items: center;">[Твой скин]</div>
+                <div style="font-size: 24px; font-weight: bold; margin-top: 5px;">Счет: 2</div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
+        // --- БАЗА ДАННЫХ И СЛОВАРЬ ---
         let dictionary = new Set();
-        let currentLevelIndex = 0;
         let enteredWords = [];
-        
-        // Для отладки запомним первые 10 слов
-        let sampleWords = [];
+        let currentLevelIndex = 0;
+        let bonusBalance = parseInt(localStorage.getItem('wordBattleBonus') || '50'); // Начинаем с 50 бонусов
 
-        const levels = [
+        // Базовые уровни (можно легко расширить)
+        let levels = [
             { type: 'startsWith', val: 'к', text: 'Начинается на "К"', target: 3 },
             { type: 'endsWith', val: 'а', text: 'Заканчивается на "А"', target: 3 },
             { type: 'contains', val: 'ь', text: 'Содержит "Ь" или "Ъ"', target: 3 },
             { type: 'length', val: 5, text: 'Ровно 5 букв', target: 4 },
-            { type: 'startsWith', val: 'п', text: 'Начинается на "П"', target: 4 }
+            { type: 'startsWith', val: 'п', text: 'Начинается на "П"', target: 4 },
+            { type: 'endsWith', val: 'я', text: 'Заканчивается на "Я"', target: 4 },
+            { type: 'contains', val: 'о', text: 'Содержит букву "О"', target: 5 },
+            { type: 'length', val: 7, text: 'Ровно 7 букв', target: 3 }
         ];
 
-        // Очистка слова от лишних символов и замена ё на е
+        // --- УТИЛИТЫ ---
         function normalizeWord(word) {
-            return word.toLowerCase()
-                       .replace(/ё/g, 'е')
-                       .replace(/[^а-я]/g, ''); 
+            return word.toLowerCase().replace(/ё/g, 'е').replace(/[^а-я]/g, ''); 
         }
 
+        function updateBalanceUI() {
+            document.getElementById('menu-balance').innerText = bonusBalance;
+            document.getElementById('game-balance').innerText = bonusBalance;
+            localStorage.setItem('wordBattleBonus', bonusBalance);
+        }
+
+        // --- ЗАГРУЗКА СЛОВАРЯ ---
         async function gunzipToString(arrayBuffer) {
             if (typeof DecompressionStream !== 'undefined') {
                 try {
                     const stream = new Blob([arrayBuffer]).stream().pipeThrough(new DecompressionStream('gzip'));
                     return await new Response(stream).text();
-                } catch (e) { console.warn('DecompressionStream fallback', e); }
+                } catch (e) { console.warn('Fallback', e); }
             }
             if (typeof pako === 'undefined') {
-                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js');
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js';
+                    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+                });
             }
             return pako.inflate(new Uint8Array(arrayBuffer), { to: 'string' });
-        }
-
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = src;
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('Не удалось загрузить ' + src));
-                document.head.appendChild(s);
-            });
         }
 
         async function loadDictionary() {
             const loadingText = document.getElementById('loading-text');
             try {
-                // ДОБАВЛЕН ?v=time ЧТОБЫ ОБОЙТИ КЭШ
                 const response = await fetch('words.txt.gz?v=' + Date.now());
-                if (!response.ok) throw new Error('Файл words.txt.gz не найден (HTTP ' + response.status + ')');
+                if (!response.ok) throw new Error('Файл не найден');
 
                 const buffer = await response.arrayBuffer();
                 let text = await gunzipToString(buffer);
+                text = text.replace(/^\uFEFF/, ''); // Очистка BOM
 
-                // Убираем BOM-символ
-                text = text.replace(/^\uFEFF/, '');
-
-                // Разбиваем на строки и нормализуем
-                const wordsArray = text.split(/\r?\n/)
-                                      .map(w => normalizeWord(w))
-                                      .filter(w => w.length > 0);
-
+                const wordsArray = text.split(/\r?\n/).map(w => normalizeWord(w)).filter(w => w.length > 0);
                 dictionary = new Set(wordsArray);
-                
-                // Сохраняем первые 10 слов для отладки
-                sampleWords = Array.from(dictionary).slice(0, 10);
-                
-                console.log(`Словарь загружен! Слов: ${dictionary.size}`);
-                console.log("Примеры слов:", sampleWords);
 
                 document.getElementById('loading-screen').style.display = 'none';
                 const startBtn = document.getElementById('btn-start');
                 startBtn.disabled = false;
-                startBtn.innerText = 'Одиночный режим';
-
+                startBtn.innerText = '🎮 Одиночный режим';
+                updateBalanceUI();
             } catch (error) {
                 console.error(error);
                 loadingText.style.color = 'red';
-                loadingText.innerText = 'Ошибка загрузки словаря';
-                tg.showAlert('Ошибка загрузки: ' + error.message);
+                loadingText.innerText = 'Ошибка словаря';
+                tg.showAlert('Ошибка: ' + error.message);
             }
         }
 
         loadDictionary();
 
+        // --- НАВИГАЦИЯ ---
         function switchScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
-        }
-
-        function startGame() {
-            tg.HapticFeedback.impactOccurred('medium');
-            currentLevelIndex = 0;
-            switchScreen('screen-game');
-            loadLevel();
         }
 
         function goToMenu() {
@@ -221,15 +284,29 @@
             switchScreen('screen-menu');
         }
 
+        function showPvpMockup() {
+            tg.HapticFeedback.impactOccurred('medium');
+            switchScreen('screen-pvp');
+        }
+
+        // --- ЛОГИКА ОДИНОЧНОЙ ИГРЫ ---
+        function startGame() {
+            tg.HapticFeedback.impactOccurred('medium');
+            currentLevelIndex = 0;
+            switchScreen('screen-game');
+            loadLevel();
+        }
+
         function loadLevel() {
             enteredWords = [];
             document.getElementById('words-container').innerHTML = '';
             document.getElementById('word-input').value = '';
-
+            
+            // Если уровни закончились - генерируем новый случайный
             if (currentLevelIndex >= levels.length) {
-                tg.showAlert('Поздравляю! Ты прошел все уровни!');
-                goToMenu();
-                return;
+                tg.showAlert('Поздравляю! Ты прошел все базовые уровни. Дальше бесконечный режим!');
+                // Пример генерации: длина от 4 до 8 букв
+                levels.push({ type: 'length', val: Math.floor(Math.random() * 5) + 4, text: `Ровно ${levels.length} букв`, target: 4 });
             }
 
             const level = levels[currentLevelIndex];
@@ -243,6 +320,43 @@
             document.getElementById('progress-text').innerText = `Введено: ${enteredWords.length} / ${level.target}`;
         }
 
+        // --- СПОСОБНОСТИ (БОНУСЫ) ---
+        function changeLetter() {
+            if (bonusBalance < 10) return tg.showAlert('Недостаточно бонусов!');
+            const newLetter = prompt("Введите новую букву (например: А, Б, В...):");
+            if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+            
+            const level = levels[currentLevelIndex];
+            level.val = newLetter.toLowerCase();
+            level.text = `Начинается на "${newLetter.toUpperCase()}"`; // Для упрощения меняем на старт с буквы
+            
+            bonusBalance -= 10;
+            updateBalanceUI();
+            document.getElementById('current-task').innerText = level.text;
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert('Буква изменена!');
+        }
+
+        function changeCondition() {
+            if (bonusBalance < 15) return tg.showAlert('Недостаточно бонусов!');
+            
+            const level = levels[currentLevelIndex];
+            const conditions = [
+                { type: 'endsWith', val: 'а', text: 'Заканчивается на "А"' },
+                { type: 'contains', val: 'ь', text: 'Содержит "Ь" или "Ъ"' },
+                { type: 'length', val: 6, text: 'Ровно 6 букв' }
+            ];
+            const newCond = conditions[Math.floor(Math.random() * conditions.length)];
+            
+            Object.assign(level, newCond);
+            bonusBalance -= 15;
+            updateBalanceUI();
+            document.getElementById('current-task').innerText = level.text;
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert('Условие изменено!');
+        }
+
+        // --- ПРОВЕРКА СЛОВ ---
         function checkWord() {
             const input = document.getElementById('word-input');
             const rawWord = input.value.trim();
@@ -258,14 +372,7 @@
 
             if (!dictionary.has(word)) {
                 tg.HapticFeedback.notificationOccurred('error');
-                
-                // ОТЛАДКА: Показываем пользователю, что в словаре
-                let debugMsg = `Слова "${word}" нет в словаре.\n\n`;
-                debugMsg += `Всего слов: ${dictionary.size}\n\n`;
-                debugMsg += `Первые слова из файла:\n${sampleWords.join(', ')}`;
-                
-                // Показываем всплывающее окно с инфой
-                tg.showAlert(debugMsg);
+                tg.showAlert('Такого слова нет в словаре!');
                 return;
             }
 
@@ -274,7 +381,7 @@
 
             if (level.type === 'startsWith') isValid = word.startsWith(level.val);
             else if (level.type === 'endsWith') isValid = word.endsWith(level.val);
-            else if (level.type === 'contains') isValid = word.includes('ь') || word.includes('ъ');
+            else if (level.type === 'contains') isValid = word.includes(level.val);
             else if (level.type === 'length') isValid = word.length === level.val;
 
             if (!isValid) {
@@ -289,10 +396,11 @@
                 return;
             }
 
+            // Успех
             tg.HapticFeedback.notificationOccurred('success');
             enteredWords.push(word);
             input.value = ''; 
-
+            
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
             wordItem.innerHTML = `<span>${rawWord}</span> <span>+1</span>`;
@@ -301,9 +409,13 @@
             updateProgress();
 
             if (enteredWords.length >= level.target) {
+                // Награда за уровень
+                bonusBalance += 20; 
+                updateBalanceUI();
+                
                 tg.HapticFeedback.notificationOccurred('success');
                 setTimeout(() => {
-                    tg.showAlert('Уровень пройден!');
+                    tg.showAlert('Уровень пройден! +20 🪙');
                     currentLevelIndex++;
                     loadLevel();
                 }, 300);
