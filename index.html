@@ -335,7 +335,7 @@
         let hintUsedForCurrentWord = false;
 
         const TOTAL_LEVELS = 100;
-        let allLevels = []; // Будет заполнен после загрузки словаря
+        let allLevels = []; 
 
         // --- ХЕЛПЕР ДЛЯ ПОПАПОВ ---
         function showPopup(title, message) {
@@ -419,7 +419,7 @@
 
         // --- ГЕНЕРАТОР УРОВНЕЙ ---
         function generateLevels() {
-            allLevels = []; // Очищаем перед генерацией
+            allLevels = [];
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
             
@@ -444,7 +444,6 @@
                 allLevels.push({ type, val, text, target });
             }
 
-            // ВАЖНО: Берем слова из словаря, чтобы уровни были решаемыми
             const wordsArray = Array.from(dictionary);
             const vowels = 'аеиоуыэюя';
             const consonants = 'бвгджзклмнпрстфхцчшщ';
@@ -455,20 +454,17 @@
                 const target = 3 + Math.floor(idx / 17);
                 const poolSize = 8 + Math.floor(idx / 10); 
                 
-                // 1. Выбираем случайное слово из словаря (длиной 4-7 букв)
                 let baseWord = "";
                 while (baseWord.length < 4 || baseWord.length > 7) {
                     baseWord = wordsArray[Math.floor(Math.random() * wordsArray.length)];
                 }
                 
-                // 2. Формируем пул букв из этого слова
                 let pool = baseWord.split('');
                 while (pool.length < poolSize) {
                     pool.push(Math.random() < 0.4 ? vowels[Math.floor(Math.random() * vowels.length)] : consonants[Math.floor(Math.random() * consonants.length)]);
                 }
                 pool.sort(() => Math.random() - 0.5);
 
-                // 3. Выбираем условие, привязанное к базовому слову
                 const condType = condTypes[idx % condTypes.length];
                 let conditionVal = null;
                 let text = "";
@@ -489,14 +485,7 @@
                     text = `Составь ${target} слова с буквой "${conditionVal.toUpperCase()}"`;
                 }
 
-                allLevels.push({ 
-                    type: 'letters', 
-                    val: pool, 
-                    condType: condType,
-                    condVal: conditionVal,
-                    text: text, 
-                    target: target 
-                });
+                allLevels.push({ type: 'letters', val: pool, condType, condVal: conditionVal, text, target });
             }
         }
 
@@ -563,7 +552,6 @@
                 const wordsArray = text.split(/\r?\n/).map(w => normalizeWord(w)).filter(w => w.length > 0);
                 dictionary = new Set(wordsArray);
 
-                // ВАЖНО: Генерируем уровни ТОЛЬКО после загрузки словаря
                 generateLevels();
 
                 document.getElementById('loading-screen').style.display = 'none';
@@ -763,12 +751,10 @@
             btn.innerText = '⏳ Поиск...';
             tg.HapticFeedback.impactOccurred('light');
 
-            // Даем UI обновиться перед тяжелым поиском
             setTimeout(() => {
                 const level = allLevels[currentLevelIndex - 1];
                 let validWord = null;
 
-                // Ищем слово, которое еще не введено
                 for (const w of dictionary) {
                     if (w.length < 3) continue;
                     if (enteredWords.includes(w)) continue;
@@ -783,9 +769,6 @@
                     break;
                 }
 
-                btn.innerText = originalText;
-
-                // Если по какой-то причине слова не нашлось, даем любое возможное
                 if (!validWord) {
                     for (const w of dictionary) {
                         if (w.length < 3) continue;
@@ -797,11 +780,12 @@
                     }
                 }
 
+                btn.innerText = originalText;
+
                 if (!validWord) {
-                    return showPopup('Не найдено', 'Все возможные слова уже введены!');
+                    return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих слов нет.');
                 }
 
-                // Очищаем текущий ввод
                 currentWord = "";
                 selectedTileElements.forEach(el => el.classList.remove('used'));
                 selectedTileElements = [];
@@ -810,9 +794,22 @@
                 const halfLength = Math.ceil(validWord.length / 2);
                 const hintPart = validWord.slice(0, halfLength);
 
+                let filledAny = false;
                 for (let char of hintPart) {
-                    const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.innerText === char && !el.classList.contains('used'));
-                    if (tile) clickTile(tile, char);
+                    // ИСПОЛЬЗУЕМ textContent, ЧТОБЫ ОБОЙТИ text-transform: uppercase
+                    const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => 
+                        el.textContent.trim().toLowerCase() === char && 
+                        !el.classList.contains('used')
+                    );
+                    
+                    if (tile) {
+                        clickTile(tile, char);
+                        filledAny = true;
+                    }
+                }
+
+                if (!filledAny) {
+                    return showPopup('Ошибка', 'Не удалось вставить буквы. Попробуйте сами!');
                 }
 
                 bonusBalance -= 20;
