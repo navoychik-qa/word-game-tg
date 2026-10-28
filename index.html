@@ -776,23 +776,40 @@
                         return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих под условие слов нет.');
                     }
 
-                    // 2. Сортируем, чтобы взять самое длинное слово
+                    // 2. Сортируем по длине (от длинных к коротким)
                     candidates.sort((a, b) => b.length - a.length);
-                    const bestWord = candidates[0];
+                    
+                    let bestWord = null;
+                    let bestHintPart = "";
 
-                    // 3. Очищаем текущий ввод
+                    // 3. Ищем слово, которое даст НОВУЮ подсказку, а не ту, что уже есть в начале введенных слов
+                    for (const w of candidates) {
+                        const halfLength = Math.ceil(w.length / 2);
+                        const hintPart = w.slice(0, halfLength);
+                        
+                        // Проверяем: не начинается ли какое-либо введенное слово с этой же подсказки
+                        const isPrefixOfEntered = enteredWords.some(ew => ew.startsWith(hintPart));
+                        
+                        if (!isPrefixOfEntered) {
+                            bestWord = w;
+                            bestHintPart = hintPart;
+                            break;
+                        }
+                    }
+
+                    if (!bestWord) {
+                        btn.innerText = originalText;
+                        return showPopup('Не найдено', 'Все оставшиеся слова начинаются с тех же букв, что вы уже вводили. Попробуйте угадать сами!');
+                    }
+
+                    // 4. Очищаем текущий ввод
                     currentWord = "";
                     selectedTileElements.forEach(el => el.classList.remove('used'));
                     selectedTileElements = [];
                     document.getElementById('current-word-display').innerText = '';
 
-                    // 4. Берем ровно половину слова (округляя вверх)
-                    const halfLength = Math.ceil(bestWord.length / 2);
-                    const hintPart = bestWord.slice(0, halfLength);
-
-                    let filledAny = false;
-                    
-                    for (let char of hintPart) {
+                    // 5. Вставляем половину слова
+                    for (let char of bestHintPart) {
                         const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => 
                             el.dataset.letter === char && 
                             !el.classList.contains('used')
@@ -800,16 +817,10 @@
                         
                         if (tile) {
                             clickTile(tile, char);
-                            filledAny = true;
                         }
                     }
 
                     btn.innerText = originalText;
-
-                    if (!filledAny) {
-                        return showPopup('Ошибка', 'Не удалось вставить буквы. Попробуйте сами!');
-                    }
-
                     bonusBalance -= 20;
                     updateBalanceUI();
                     hintUsedForCurrentWord = true;
