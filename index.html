@@ -109,7 +109,6 @@
         }
         .action-btn span { font-size: 10px; opacity: 0.8; }
         
-        /* Кнопка подсказки (широкая) */
         .hint-btn {
             width: 100%; flex: none; padding: 12px; font-size: 14px; flex-direction: row; gap: 10px;
         }
@@ -336,7 +335,7 @@
         let hintUsedForCurrentWord = false;
 
         const TOTAL_LEVELS = 100;
-        const allLevels = [];
+        let allLevels = []; // Будет заполнен после загрузки словаря
 
         // --- ХЕЛПЕР ДЛЯ ПОПАПОВ ---
         function showPopup(title, message) {
@@ -420,6 +419,7 @@
 
         // --- ГЕНЕРАТОР УРОВНЕЙ ---
         function generateLevels() {
+            allLevels = []; // Очищаем перед генерацией
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
             
@@ -444,23 +444,31 @@
                 allLevels.push({ type, val, text, target });
             }
 
+            // ВАЖНО: Берем слова из словаря, чтобы уровни были решаемыми
+            const wordsArray = Array.from(dictionary);
             const vowels = 'аеиоуыэюя';
             const consonants = 'бвгджзклмнпрстфхцчшщ';
             const condTypes = ['length', 'startsWith', 'endsWith', 'contains', 'any'];
             
             for (let i = 51; i <= 100; i++) {
                 const idx = i - 51;
-                const poolSize = 8 + Math.floor(idx / 10); 
                 const target = 3 + Math.floor(idx / 17);
+                const poolSize = 8 + Math.floor(idx / 10); 
                 
-                let pool = [];
-                const seed = i * 13;
-                for (let j = 0; j < poolSize; j++) {
-                    if ((seed + j) % 10 < 4) { pool.push(vowels[(seed + j) % vowels.length]); } 
-                    else { pool.push(consonants[(seed * 2 + j) % consonants.length]); }
+                // 1. Выбираем случайное слово из словаря (длиной 4-7 букв)
+                let baseWord = "";
+                while (baseWord.length < 4 || baseWord.length > 7) {
+                    baseWord = wordsArray[Math.floor(Math.random() * wordsArray.length)];
+                }
+                
+                // 2. Формируем пул букв из этого слова
+                let pool = baseWord.split('');
+                while (pool.length < poolSize) {
+                    pool.push(Math.random() < 0.4 ? vowels[Math.floor(Math.random() * vowels.length)] : consonants[Math.floor(Math.random() * consonants.length)]);
                 }
                 pool.sort(() => Math.random() - 0.5);
 
+                // 3. Выбираем условие, привязанное к базовому слову
                 const condType = condTypes[idx % condTypes.length];
                 let conditionVal = null;
                 let text = "";
@@ -468,18 +476,16 @@
                 if (condType === 'any') {
                     text = `Составь ${target} любых слова`;
                 } else if (condType === 'length') {
-                    conditionVal = 4 + (idx % 3);
+                    conditionVal = baseWord.length;
                     text = `Составь ${target} слова ровно из ${conditionVal} букв`;
                 } else if (condType === 'startsWith') {
-                    conditionVal = pool[Math.floor(Math.random() * pool.length)];
+                    conditionVal = baseWord[0];
                     text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`;
                 } else if (condType === 'endsWith') {
-                    const poolVowels = pool.filter(c => vowels.includes(c));
-                    if (poolVowels.length > 0) conditionVal = poolVowels[Math.floor(Math.random() * poolVowels.length)];
-                    else conditionVal = pool[pool.length - 1];
+                    conditionVal = baseWord[baseWord.length - 1];
                     text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`;
                 } else if (condType === 'contains') {
-                    conditionVal = pool[Math.floor(Math.random() * pool.length)];
+                    conditionVal = baseWord[Math.floor(Math.random() * baseWord.length)];
                     text = `Составь ${target} слова с буквой "${conditionVal.toUpperCase()}"`;
                 }
 
@@ -493,7 +499,6 @@
                 });
             }
         }
-        generateLevels();
 
         // --- УТИЛИТЫ ---
         function normalizeWord(word) {
@@ -557,6 +562,9 @@
 
                 const wordsArray = text.split(/\r?\n/).map(w => normalizeWord(w)).filter(w => w.length > 0);
                 dictionary = new Set(wordsArray);
+
+                // ВАЖНО: Генерируем уровни ТОЛЬКО после загрузки словаря
+                generateLevels();
 
                 document.getElementById('loading-screen').style.display = 'none';
                 document.getElementById('btn-start').disabled = false;
@@ -760,6 +768,7 @@
                 const level = allLevels[currentLevelIndex - 1];
                 let validWord = null;
 
+                // Ищем слово, которое еще не введено
                 for (const w of dictionary) {
                     if (w.length < 3) continue;
                     if (enteredWords.includes(w)) continue;
@@ -776,8 +785,20 @@
 
                 btn.innerText = originalText;
 
+                // Если по какой-то причине слова не нашлось, даем любое возможное
                 if (!validWord) {
-                    return showPopup('Не найдено', 'Не удалось найти подходящее слово для подсказки. Попробуйте сами!');
+                    for (const w of dictionary) {
+                        if (w.length < 3) continue;
+                        if (enteredWords.includes(w)) continue;
+                        if (canFormFromLetters(w, level.val)) {
+                            validWord = w;
+                            break;
+                        }
+                    }
+                }
+
+                if (!validWord) {
+                    return showPopup('Не найдено', 'Все возможные слова уже введены!');
                 }
 
                 // Очищаем текущий ввод
