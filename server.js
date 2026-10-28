@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib'); // Модуль для работы с gzip
 
 const app = express();
 app.use(cors());
@@ -18,22 +19,26 @@ const playersDB = {};
 const queue = []; 
 const rooms = {};
 
-// --- ЗАГРУЗКА СЛОВАРЯ ---
+// --- ЗАГРУЗКА СЛОВАРЯ ИЗ АРХИВА ---
 let DICTIONARY = new Set();
 try {
-    const wordsPath = path.join(__dirname, 'words.txt');
+    const wordsPath = path.join(__dirname, 'words.txt.gz');
     if (fs.existsSync(wordsPath)) {
-        const data = fs.readFileSync(wordsPath, 'utf8');
+        console.log('Чтение архива words.txt.gz...');
+        const buffer = fs.readFileSync(wordsPath);
+        // Распаковываем gzip в строку
+        const data = zlib.gunzipSync(buffer).toString('utf8');
+        
         const words = data.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1);
         DICTIONARY = new Set(words);
-        console.log(`Словарь загружен. Слов: ${DICTIONARY.size}`);
+        console.log(`Словарь успешно распакован. Слов: ${DICTIONARY.size}`);
     } else {
-        console.log('words.txt не найден. Используется тестовый словарь.');
-        // Заглушка, если нет файла
-        DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот', 'собака', 'привет', 'слово', 'корова', 'молоко', 'сметана']);
+        console.log('words.txt.gz не найден. Используется тестовый словарь.');
+        DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот', 'собака', 'привет', 'слово', 'корова', 'молоко', 'сметана', 'перфекционизм', 'персик']);
     }
 } catch (e) {
-    console.error('Ошибка загрузки словаря', e);
+    console.error('Ошибка загрузки словаря:', e);
+    DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот', 'собака']);
 }
 
 // --- ГЕНЕРАТОР ЗАДАНИЙ ---
@@ -151,7 +156,7 @@ io.on('connection', (socket) => {
         const opponent = room.players[opponentId];
 
         if (type === 1) {
-            // Смена буквы (только для startsWith)
+            // Смена буквы
             if (room.task.conditionType === 'startsWith') {
                 const l = letters[Math.floor(Math.random() * letters.length)];
                 room.task.conditionVal = l;
@@ -236,7 +241,6 @@ function startRound(roomId) {
     const room = rooms[roomId];
     if (!room) return;
     
-    // Сброс на новый раунд
     room.roundWords = [];
     room.players[room.p1].score = 0;
     room.players[room.p2].score = 0;
@@ -291,8 +295,6 @@ function endRound(roomId) {
         const winner = room.players[room.p1].lives > 0 ? room.p1 : room.p2;
         const loser = room.players[room.p1].lives > 0 ? room.p2 : room.p1;
         
-        // Начисление рейтинга
-        playersDB[room.players[winner] ? winner : p1.id]; // Заглушка, чтобы не падало
         io.to(roomId).emit('game_over', { winnerId: winner, loserId: loser });
         delete rooms[roomId];
     } else {
