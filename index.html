@@ -22,7 +22,7 @@
         }
         .screen { display: none; width: 100%; max-width: 400px; flex-direction: column; height: 100%; }
         .screen.active { display: flex; }
-        
+
         .menu-title { font-size: 32px; font-weight: bold; text-align: center; margin-top: 40px; margin-bottom: 40px; }
         .btn {
             background-color: var(--btn); color: var(--btn-text);
@@ -30,18 +30,18 @@
             font-size: 18px; font-weight: 600; margin-bottom: 16px; cursor: pointer;
         }
         .btn:disabled { opacity: 0.5; background-color: var(--hint); }
-        
+
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .back-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); }
         .level-info { font-size: 18px; font-weight: bold; }
-        
+
         .task-card {
             background-color: var(--secondary-bg); padding: 20px; border-radius: 16px;
             text-align: center; margin-bottom: 20px;
         }
         .task-title { font-size: 16px; color: var(--hint); margin-bottom: 8px; }
         .task-word { font-size: 22px; font-weight: bold; color: var(--btn); }
-        
+
         .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
         input {
             flex: 1; padding: 16px; border-radius: 12px; border: 1px solid var(--hint);
@@ -60,12 +60,12 @@
         }
         .word-item span:last-child { color: #4CAF50; font-weight: bold; }
         .progress { font-size: 16px; font-weight: bold; color: var(--btn); text-align: center; margin-top: 10px; }
-        
+
         @keyframes slideIn {
             from { transform: translateY(-10px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-        
+
         /* Экран загрузки */
         #loading-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -85,7 +85,7 @@
     <!-- Экран загрузки словаря -->
     <div id="loading-screen">
         <div class="spinner"></div>
-        <div>Загрузка словаря...</div>
+        <div id="loading-text">Загрузка словаря...</div>
     </div>
 
     <!-- ЭКРАН 1: Меню -->
@@ -123,7 +123,7 @@
         tg.expand();
 
         // --- ПЕРЕМЕННЫЕ ---
-        let dictionary = new Set(); // Здесь будем хранить словарь
+        let dictionary = new Set();
         let currentLevelIndex = 0;
         let enteredWords = [];
 
@@ -135,20 +135,51 @@
             { type: 'startsWith', val: 'п', text: 'Начинается на "П"', target: 4 }
         ];
 
+        // --- РАСПАКОВКА GZIP ---
+        // Приоритет: нативный DecompressionStream → pako (fallback)
+        async function gunzipToString(arrayBuffer) {
+            // 1) Нативный способ (Chrome 80+, Safari 16.4+, все современные Telegram WebView)
+            if (typeof DecompressionStream !== 'undefined') {
+                try {
+                    const stream = new Blob([arrayBuffer]).stream()
+                        .pipeThrough(new DecompressionStream('gzip'));
+                    return await new Response(stream).text();
+                } catch (e) {
+                    console.warn('DecompressionStream не справился, пробуем pako...', e);
+                }
+            }
+
+            // 2) Fallback через pako
+            if (typeof pako === 'undefined') {
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js');
+            }
+            return pako.inflate(new Uint8Array(arrayBuffer), { to: 'string' });
+        }
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Не удалось загрузить ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
         // --- ЗАГРУЗКА СЛОВАРЯ ПРИ СТАРТЕ ---
         async function loadDictionary() {
+            const loadingText = document.getElementById('loading-text');
             try {
-                // Скачиваем файл words.txt
                 const response = await fetch('words.txt.gz');
-                if (!response.ok) throw new Error('Файл не найден');
-                
-                const text = await response.text();
-                // Разбиваем по строкам, убираем пробелы, приводим к нижнему регистру
-                const wordsArray = text.split('\n')
+                if (!response.ok) throw new Error('Файл words.txt.gz не найден (HTTP ' + response.status + ')');
+
+                const buffer = await response.arrayBuffer();
+                const text = await gunzipToString(buffer);
+
+                const wordsArray = text.split(/\r?\n/)
                                       .map(w => w.trim().toLowerCase())
                                       .filter(w => w.length > 0);
-                
-                // Закидываем в Set для мгновенного поиска
+
                 dictionary = new Set(wordsArray);
                 console.log(`Словарь загружен! Слов: ${dictionary.size}`);
 
@@ -160,8 +191,9 @@
 
             } catch (error) {
                 console.error(error);
-                tg.showAlert('Ошибка загрузки словаря. Проверьте, что words.txt.gz загружен на GitHub.');
-                document.getElementById('loading-screen').innerHTML = '<div style="color:red">Ошибка загрузки словаря</div>';
+                loadingText.style.color = 'red';
+                loadingText.innerText = 'Ошибка загрузки словаря';
+                tg.showAlert('Ошибка загрузки словаря: ' + error.message);
             }
         }
 
@@ -190,7 +222,7 @@
             enteredWords = [];
             document.getElementById('words-container').innerHTML = '';
             document.getElementById('word-input').value = '';
-            
+
             if (currentLevelIndex >= levels.length) {
                 tg.showAlert('Поздравляю! Ты прошел все уровни!');
                 goToMenu();
@@ -205,13 +237,14 @@
 
         function updateProgress() {
             const level = levels[currentLevelIndex];
-            document.getElementById('progress-text').innerText = `Введено: ${enteredWords.length} / ${level.target}`;
+            document.getElementById('progress-text').innerText =
+                `Введено: ${enteredWords.length} / ${level.target}`;
         }
 
         function checkWord() {
             const input = document.getElementById('word-input');
             const word = input.value.trim().toLowerCase();
-            
+
             if (!word) return;
 
             // 1. Только русские буквы
@@ -221,7 +254,7 @@
                 return;
             }
 
-            // 2. ПРОВЕРКА ПО СЛОВАРЮ
+            // 2. Проверка по словарю
             if (!dictionary.has(word)) {
                 tg.HapticFeedback.notificationOccurred('error');
                 tg.showAlert('Такого слова нет в словаре!');
@@ -250,11 +283,11 @@
                 return;
             }
 
-            // УСПЕХ!
+            // Успех!
             tg.HapticFeedback.notificationOccurred('success');
             enteredWords.push(word);
-            input.value = ''; 
-            
+            input.value = '';
+
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
             wordItem.innerHTML = `<span>${word}</span> <span>+1</span>`;
