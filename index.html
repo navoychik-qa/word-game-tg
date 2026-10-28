@@ -52,7 +52,7 @@
 
         /* Меню */
         .menu-header { position: relative; display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 10px; width: 100%; }
-        .menu-title { font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin: 0; }
+        .menu-title { font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin: 0; cursor: pointer; user-select: none; }
         .theme-toggle { position: absolute; right: 0; background: none; border: none; font-size: 24px; cursor: pointer; padding: 5px; color: var(--text); z-index: 10; }
         
         .balance { font-size: 18px; color: var(--gold); text-align: center; margin-bottom: 20px; font-weight: bold; }
@@ -174,6 +174,30 @@
         /* PvP */
         .pvp-mockup { flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, #2b1055 0%, #7597de 100%); border-radius: 16px; padding: 20px; text-align: center; color: white; }
         .pvp-timer { font-size: 32px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; margin: 0 auto 10px auto; width: fit-content; }
+
+        /* МОДАЛЬНОЕ ОКНО ДЛЯ АДМИНКИ */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000;
+            justify-content: center; align-items: center; backdrop-filter: blur(3px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: var(--bg); padding: 25px; border-radius: 16px;
+            width: 80%; max-width: 300px; text-align: center;
+            border: 1px solid var(--hint); animation: slideIn 0.2s ease-out;
+        }
+        .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--gold); }
+        .modal-input {
+            width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px;
+            border: 1px solid var(--hint); background: var(--secondary-bg); color: var(--text);
+            font-size: 16px; margin-bottom: 15px; text-align: center; outline: none;
+        }
+        .modal-input:focus { border-color: var(--gold); }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        .modal-btn.cancel { background: var(--secondary-bg); color: var(--text); }
+        .modal-btn.confirm { background: var(--gold); color: #000; }
     </style>
 </head>
 <body>
@@ -183,10 +207,23 @@
         <div id="loading-text">Загрузка словаря...</div>
     </div>
 
+    <!-- МОДАЛЬНОЕ ОКНО ПАРОЛЯ -->
+    <div class="modal-overlay" id="admin-modal">
+        <div class="modal-content">
+            <div class="modal-title">👑 Секретная панель</div>
+            <input type="password" id="admin-password-input" class="modal-input" placeholder="Введите пароль..." autocomplete="off">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeAdminModal()">Отмена</button>
+                <button class="modal-btn confirm" onclick="checkAdminPassword()">Войти</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ЭКРАН 1: Главное меню -->
     <div id="screen-menu" class="screen active">
         <div class="menu-header">
-            <div class="menu-title">Word Battle</div>
+            <!-- Добавлен ID и обработчик клика для секретной админки -->
+            <div class="menu-title" id="admin-trigger" onclick="handleAdminTap()">Word Battle</div>
             <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">☀️</button>
         </div>
         
@@ -293,6 +330,59 @@
 
         const TOTAL_LEVELS = 100;
         const allLevels = [];
+
+        // --- СЕКРЕТНАЯ АДМИНКА ---
+        let adminTapCount = 0;
+        let adminTapTimer;
+
+        function handleAdminTap() {
+            adminTapCount++;
+            clearTimeout(adminTapTimer);
+            // Сбрасываем счетчик, если пауза больше 1.5 секунд
+            adminTapTimer = setTimeout(() => { adminTapCount = 0; }, 1500);
+
+            if (adminTapCount >= 5) {
+                adminTapCount = 0;
+                openAdminModal();
+            }
+        }
+
+        function openAdminModal() {
+            document.getElementById('admin-password-input').value = '';
+            document.getElementById('admin-modal').classList.add('active');
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function closeAdminModal() {
+            document.getElementById('admin-modal').classList.remove('active');
+        }
+
+        function checkAdminPassword() {
+            const pass = document.getElementById('admin-password-input').value.trim();
+            
+            if (pass === 'Alabamagranda') {
+                // Пароль верный
+                closeAdminModal();
+                maxUnlockedLevel = 100;
+                localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
+                bonusBalance += 5000; // Бонусом накидываем монет
+                updateBalanceUI();
+                updateMenuUI();
+                
+                tg.HapticFeedback.notificationOccurred('success');
+                tg.showAlert('👑 Пароль верный! Админ-режим активирован.\nВсе 100 уровней открыты + 5000 монет.');
+            } else {
+                // Пароль неверный
+                tg.HapticFeedback.notificationOccurred('error');
+                tg.showAlert('❌ Неверный пароль!');
+                document.getElementById('admin-password-input').value = '';
+            }
+        }
+
+        // Обработка нажатия Enter в поле пароля
+        document.getElementById('admin-password-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') checkAdminPassword();
+        });
 
         // --- ТЕМА ---
         function initTheme() {
@@ -628,7 +718,19 @@
             const level = allLevels[currentLevelIndex - 1];
             if (level.type === 'letters') return tg.showAlert('В главе 2 нельзя менять условие!');
             
-            // Логика для 1 главы...
+            const conditions = [
+                { type: 'endsWith', val: 'а', text: 'Заканчивается на "А"' },
+                { type: 'contains', val: 'ь', text: 'Содержит "Ь"' },
+                { type: 'length', val: 5, text: 'Ровно 5 букв' }
+            ];
+            const newCond = conditions[Math.floor(Math.random() * conditions.length)];
+            Object.assign(level, newCond);
+            
+            bonusBalance -= 15;
+            updateBalanceUI();
+            document.getElementById('current-task').innerText = level.text;
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert('Условие изменено!');
         }
 
         // --- ВАЛИДАЦИЯ СЛОВ ---
@@ -653,7 +755,6 @@
 
             const level = allLevels[currentLevelIndex - 1];
             
-            // Проверка для главы 2 (уже собрано из плиток, так что валидация букв пройдена)
             if (level.type !== 'letters') {
                 let isValid = false;
                 if (level.type === 'startsWith') isValid = word.startsWith(level.val);
@@ -679,7 +780,6 @@
             enteredWords.push(word);
             
             if (isTileMode) {
-                // Очищаем конструктор
                 currentWord = "";
                 selectedTileElements.forEach(el => el.classList.remove('used'));
                 selectedTileElements = [];
