@@ -269,13 +269,11 @@
             <div class="task-word" id="current-task">Загрузка...</div>
         </div>
 
-        <!-- Кнопки способностей для Главы 1 -->
         <div class="action-buttons" id="ch1-actions">
             <button class="action-btn" onclick="changeLetter()">Сменить букву <span>(10 🪙)</span></button>
             <button class="action-btn" onclick="changeCondition()">Сменить условие <span>(15 🪙)</span></button>
         </div>
 
-        <!-- Кнопка подсказки для Главы 2 -->
         <div class="action-buttons" id="ch2-actions" style="display: none;">
             <button class="action-btn hint-btn" onclick="getHint()">💡 Подсказка (20 🪙)</button>
         </div>
@@ -340,6 +338,15 @@
         const TOTAL_LEVELS = 100;
         const allLevels = [];
 
+        // --- ХЕЛПЕР ДЛЯ ПОПАПОВ ---
+        function showPopup(title, message) {
+            if (tg.showPopup) {
+                tg.showPopup({ title: title, message: message, buttons: [{ type: 'ok' }] });
+            } else {
+                tg.showAlert(message);
+            }
+        }
+
         // --- СЕКРЕТНАЯ АДМИНКА ---
         let adminTapCount = 0;
         let adminTapTimer;
@@ -377,10 +384,10 @@
                 updateMenuUI();
                 
                 tg.HapticFeedback.notificationOccurred('success');
-                tg.showAlert('👑 Пароль верный! Админ-режим активирован.\nВсе 100 уровней открыты + 5000 монет.');
+                showPopup('👑 Админ-режим', 'Пароль верный! Все 100 уровней открыты. Начислено 5000 монет.');
             } else {
                 tg.HapticFeedback.notificationOccurred('error');
-                tg.showAlert('❌ Неверный пароль!');
+                showPopup('❌ Ошибка', 'Неверный пароль!');
                 document.getElementById('admin-password-input').value = '';
             }
         }
@@ -727,7 +734,6 @@
             lastTile.classList.remove('used');
             currentWord = currentWord.slice(0, -1);
             
-            // Если поле полностью очищено, разрешаем снова использовать подсказку
             if (currentWord === "") hintUsedForCurrentWord = false;
 
             document.getElementById('current-word-display').innerText = currentWord;
@@ -741,55 +747,58 @@
 
         // --- ПОДСКАЗКА (ГЛАВА 2) ---
         function getHint() {
-            if (bonusBalance < 20) return tg.showAlert('Недостаточно бонусов! Подсказка стоит 20 🪙.');
-            if (hintUsedForCurrentWord) return tg.showAlert('Вы уже использовали подсказку для этого слова!');
+            if (bonusBalance < 20) return showPopup('Ошибка', 'Недостаточно бонусов! Подсказка стоит 20 🪙.');
+            if (hintUsedForCurrentWord) return showPopup('Ошибка', 'Вы уже использовали подсказку для этого слова!');
 
-            const level = allLevels[currentLevelIndex - 1];
-            let validWord = null;
+            const btn = document.querySelector('.hint-btn');
+            const originalText = btn.innerText;
+            btn.innerText = '⏳ Поиск...';
+            tg.HapticFeedback.impactOccurred('light');
 
-            // Ищем подходящее слово в словаре
-            const wordsArray = Array.from(dictionary);
-            
-            for (let w of wordsArray) {
-                if (w.length < 3) continue;
-                if (enteredWords.includes(w)) continue;
-                if (!canFormFromLetters(w, level.val)) continue;
+            // Даем UI обновиться перед тяжелым поиском
+            setTimeout(() => {
+                const level = allLevels[currentLevelIndex - 1];
+                let validWord = null;
 
-                if (level.condType === 'length' && w.length !== level.condVal) continue;
-                if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
-                if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
-                if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
+                for (const w of dictionary) {
+                    if (w.length < 3) continue;
+                    if (enteredWords.includes(w)) continue;
+                    if (!canFormFromLetters(w, level.val)) continue;
+                    
+                    if (level.condType === 'length' && w.length !== level.condVal) continue;
+                    if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
+                    if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
+                    if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
 
-                validWord = w;
-                break;
-            }
+                    validWord = w;
+                    break;
+                }
 
-            if (!validWord) {
-                return tg.showAlert('Не удалось найти подходящее слово для подсказки. Попробуйте сами!');
-            }
+                btn.innerText = originalText;
 
-            // Очищаем текущий ввод перед подсказкой
-            currentWord = "";
-            selectedTileElements.forEach(el => el.classList.remove('used'));
-            selectedTileElements = [];
-            document.getElementById('current-word-display').innerText = '';
+                if (!validWord) {
+                    return showPopup('Не найдено', 'Не удалось найти подходящее слово для подсказки. Попробуйте сами!');
+                }
 
-            // Берем половину слова (округляя вверх)
-            const halfLength = Math.ceil(validWord.length / 2);
-            const hintPart = validWord.slice(0, halfLength);
+                // Очищаем текущий ввод
+                currentWord = "";
+                selectedTileElements.forEach(el => el.classList.remove('used'));
+                selectedTileElements = [];
+                document.getElementById('current-word-display').innerText = '';
 
-            // Автоматически нажимаем на плитки для подсказки
-            for (let char of hintPart) {
-                const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.innerText === char && !el.classList.contains('used'));
-                if (tile) clickTile(tile, char);
-            }
+                const halfLength = Math.ceil(validWord.length / 2);
+                const hintPart = validWord.slice(0, halfLength);
 
-            // Списываем бонусы
-            bonusBalance -= 20;
-            updateBalanceUI();
-            hintUsedForCurrentWord = true;
-            
-            tg.HapticFeedback.notificationOccurred('success');
+                for (let char of hintPart) {
+                    const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.innerText === char && !el.classList.contains('used'));
+                    if (tile) clickTile(tile, char);
+                }
+
+                bonusBalance -= 20;
+                updateBalanceUI();
+                hintUsedForCurrentWord = true;
+                tg.HapticFeedback.notificationOccurred('success');
+            }, 50);
         }
 
         function updateProgress() {
