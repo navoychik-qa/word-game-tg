@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Word Battle</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Подключаем Socket.io -->
+    <!-- Подключаем Socket.io для PvP -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        /* --- СТИЛИ ОСТАЮТСЯ ПРЕЖНИМИ (Скопированы из вашего кода) --- */
+        /* --- ТЕМЫ --- */
         :root, [data-theme="dark"] {
             --bg: #17212b; --text: #ffffff; --hint: #7f91a4;
             --btn: #5288c1; --btn-text: #ffffff; --secondary-bg: #232e3c;
@@ -23,6 +23,7 @@
             --locked-bg: #e0e0e0; --tile-bg: #f0d470; --tile-text: #000000; --tile-used: #cccccc;
             --star: #e67e22; --pvp-bg: linear-gradient(180deg, #a1c4fd 0%, #c2e9fb 100%);
         }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: var(--bg); color: var(--text);
@@ -30,110 +31,192 @@
             align-items: center; height: 100vh; box-sizing: border-box; overflow: hidden;
             transition: background-color 0.3s, color 0.3s;
         }
+        
         .screen { display: none; width: 100%; max-width: 400px; flex-direction: column; height: 100%; }
         .screen.active { display: flex; }
+
+        /* Меню */
         .menu-header { position: relative; display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 10px; width: 100%; }
         .menu-title { font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin: 0; cursor: pointer; user-select: none; }
         .theme-toggle { position: absolute; right: 0; background: none; border: none; font-size: 24px; cursor: pointer; padding: 5px; color: var(--text); z-index: 10; }
-        .balance { display: flex; justify-content: center; gap: 20px; font-size: 18px; font-weight: bold; margin-bottom: 20px; background: var(--secondary-bg); padding: 10px 20px; border-radius: 20px; cursor: pointer; transition: background-color 0.2s; border: 1px solid transparent; }
+        
+        .balance {
+            display: flex; justify-content: center; gap: 20px; font-size: 18px; font-weight: bold;
+            margin-bottom: 20px; background: var(--secondary-bg); padding: 10px 20px; border-radius: 20px;
+            cursor: pointer; transition: background-color 0.2s; border: 1px solid transparent;
+        }
         .balance:active { background: rgba(128,128,128,0.2); border-color: var(--hint); }
         .balance span.gold { color: var(--gold); }
         .balance span.diamond { color: var(--diamond); }
         .balance-hint { font-size: 10px; color: var(--hint); text-align: center; width: 100%; margin-top: -15px; margin-bottom: 20px; }
-        .btn { background-color: var(--btn); color: var(--btn-text); border: none; padding: 16px; border-radius: 12px; font-size: 18px; font-weight: 600; margin-bottom: 12px; cursor: pointer; transition: transform 0.1s; width: 100%; box-sizing: border-box; }
+
+        .btn {
+            background-color: var(--btn); color: var(--btn-text);
+            border: none; padding: 16px; border-radius: 12px;
+            font-size: 18px; font-weight: 600; margin-bottom: 12px; cursor: pointer;
+            transition: transform 0.1s; width: 100%; box-sizing: border-box;
+        }
         .btn:active { transform: scale(0.98); }
         .btn:disabled { opacity: 0.5; background-color: var(--hint); cursor: not-allowed; }
         .btn-secondary { background-color: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
         .btn-pvp { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
         .btn-shop { background: linear-gradient(135deg, #00BFFF 0%, #1E90FF 100%); color: white; }
         .btn-reset { background: transparent; color: var(--danger); border: 1px solid var(--danger); font-size: 14px; margin-top: auto; margin-bottom: 20px; }
+
+        /* Выбор уровней */
         .tabs { display: flex; gap: 10px; margin-bottom: 15px; }
         .tab { flex: 1; padding: 12px; text-align: center; background: var(--secondary-bg); color: var(--text); border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
         .tab.active { background: var(--btn); color: var(--btn-text); }
-        .level-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; overflow-y: auto; padding: 10px 0; flex: 1; align-content: start; }
-        .level-btn { aspect-ratio: 1; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; display: flex; justify-content: center; align-items: center; background-color: var(--secondary-bg); color: var(--text); cursor: pointer; border-bottom: 4px solid rgba(0,0,0,0.3); transition: transform 0.1s; }
+
+        .level-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            overflow-y: auto; padding: 10px 0; flex: 1; align-content: start;
+        }
+        .level-btn {
+            aspect-ratio: 1; border-radius: 12px; border: none; font-size: 18px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            background-color: var(--secondary-bg); color: var(--text); cursor: pointer;
+            border-bottom: 4px solid rgba(0,0,0,0.3); transition: transform 0.1s;
+        }
         .level-btn:active { transform: scale(0.95); }
         .level-btn.completed { background-color: var(--success); color: white; border-bottom-color: rgba(0,0,0,0.4); }
         .level-btn.locked { background-color: var(--locked-bg); color: var(--hint); cursor: not-allowed; border-bottom-color: rgba(0,0,0,0.1); }
         .level-btn.current { border: 2px solid var(--gold); }
+
+        /* Игра (Одиночная) */
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0; }
         .back-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); padding: 0; }
         .level-info { font-size: 18px; font-weight: bold; }
+        
         .game-balance { display: flex; gap: 10px; font-size: 14px; font-weight: bold; }
         .game-balance span.gold { color: var(--gold); }
         .game-balance span.diamond { color: var(--diamond); }
-        .task-card { background-color: var(--secondary-bg); padding: 15px; border-radius: 16px; text-align: center; margin-bottom: 10px; border: 1px solid rgba(128,128,128,0.2); flex-shrink: 0; }
+
+        .task-card {
+            background-color: var(--secondary-bg); padding: 15px; border-radius: 16px;
+            text-align: center; margin-bottom: 10px; border: 1px solid rgba(128,128,128,0.2); flex-shrink: 0;
+        }
         .task-title { font-size: 14px; color: var(--hint); margin-bottom: 5px; text-transform: uppercase; }
         .task-word { font-size: 18px; font-weight: bold; color: var(--btn); line-height: 1.2; }
+
         .action-buttons { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
-        .action-btn { flex: 1; background: rgba(212, 175, 55, 0.1); color: var(--gold); border: 1px solid var(--gold); border-radius: 8px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .action-btn {
+            flex: 1; background: rgba(212, 175, 55, 0.1); color: var(--gold);
+            border: 1px solid var(--gold); border-radius: 8px; padding: 8px;
+            font-size: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
         .action-btn span { font-size: 10px; opacity: 0.8; }
+        
         .hint-btn { width: 100%; flex: none; padding: 12px; font-size: 14px; flex-direction: row; gap: 10px; }
         .hint-btn.diamond-mode { background: rgba(0, 191, 255, 0.1); color: var(--diamond); border-color: var(--diamond); }
+
+        /* Ввод для Главы 1 */
         .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
-        input { flex: 1; padding: 16px; border-radius: 12px; border: 1px solid var(--hint); background-color: var(--secondary-bg); color: var(--text); font-size: 16px; outline: none; }
+        input {
+            flex: 1; padding: 16px; border-radius: 12px; border: 1px solid var(--hint);
+            background-color: var(--secondary-bg); color: var(--text); font-size: 16px; outline: none;
+        }
         input:focus { border-color: var(--btn); }
-        .submit-btn { background-color: var(--btn); color: var(--btn-text); border: none; padding: 0 20px; border-radius: 12px; font-size: 24px; font-weight: bold; cursor: pointer; }
-        .tiles-container { display: none; flex-direction: column; align-items: center; justify-content: center; flex: 1; margin-bottom: 10px; }
-        .current-word-display { font-size: 36px; font-weight: bold; letter-spacing: 2px; min-height: 45px; color: var(--btn); margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px dashed var(--hint); padding-bottom: 5px; min-width: 50px; text-align: center; }
+        .submit-btn {
+            background-color: var(--btn); color: var(--btn-text); border: none;
+            padding: 0 20px; border-radius: 12px; font-size: 24px; font-weight: bold; cursor: pointer;
+        }
+
+        /* Конструктор для Главы 2 */
+        .tiles-container {
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            flex: 1; margin-bottom: 10px;
+        }
+        .current-word-display {
+            font-size: 36px; font-weight: bold; letter-spacing: 2px; min-height: 45px;
+            color: var(--btn); margin-bottom: 20px; text-transform: uppercase;
+            border-bottom: 2px dashed var(--hint); padding-bottom: 5px; min-width: 50px; text-align: center;
+        }
         .letters-pool { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
-        .letter-tile { width: 55px; height: 55px; border-radius: 12px; background: var(--tile-bg); color: var(--tile-text); font-size: 26px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.2); user-select: none; text-transform: uppercase; transition: all 0.1s; }
+        .letter-tile {
+            width: 55px; height: 55px; border-radius: 12px; background: var(--tile-bg); color: var(--tile-text);
+            font-size: 26px; font-weight: bold; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.2); user-select: none;
+            text-transform: uppercase; transition: all 0.1s;
+        }
         .letter-tile:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
         .letter-tile.used { background: var(--tile-used); color: var(--hint); box-shadow: none; transform: translateY(4px); cursor: default; }
+        
         .tile-controls { display: flex; gap: 15px; width: 100%; justify-content: center; }
         .tile-btn { padding: 12px 24px; border-radius: 12px; font-size: 18px; font-weight: bold; border: none; cursor: pointer; }
         .tile-btn.backspace { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
         .tile-btn.submit { background: var(--success); color: white; flex: 1; max-width: 200px; }
+
         .words-list { flex: 1; overflow-y: auto; padding-bottom: 10px; min-height: 50px; }
-        .word-item { background-color: var(--secondary-bg); padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; font-size: 16px; display: flex; justify-content: space-between; animation: slideIn 0.2s ease-out; border-left: 4px solid var(--success); }
+        .word-item {
+            background-color: var(--secondary-bg); padding: 10px 15px; border-radius: 8px;
+            margin-bottom: 8px; font-size: 16px; display: flex; justify-content: space-between;
+            animation: slideIn 0.2s ease-out; border-left: 4px solid var(--success);
+        }
         .word-item span:last-child { color: var(--success); font-weight: bold; }
         .progress { font-size: 16px; font-weight: bold; color: var(--btn); text-align: center; margin-top: 10px; flex-shrink: 0; }
-        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; justify-content: center; align-items: center; flex-direction: column; z-index: 999; }
+
+        /* Загрузка */
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); display: flex; justify-content: center; align-items: center;
+            flex-direction: column; z-index: 999;
+        }
         .spinner { border: 4px solid var(--secondary-bg); border-top: 4px solid var(--btn); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        
         @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
+
         /* PvP (Бой) */
-        .pvp-screen { background: var(--pvp-bg); border-radius: 16px; padding: 15px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; color: white; position: relative; }
+        .pvp-screen {
+            background: var(--pvp-bg); border-radius: 16px; padding: 15px; display: flex; flex-direction: column;
+            height: 100%; box-sizing: border-box; color: white; position: relative;
+        }
         .pvp-player { text-align: center; flex-shrink: 0; }
         .pvp-player.enemy { margin-bottom: 10px; }
         .pvp-player.me { margin-top: 10px; }
         .pvp-name { font-size: 14px; font-weight: bold; opacity: 0.9; }
         .pvp-lives { font-size: 16px; letter-spacing: 2px; margin: 2px 0; }
         .pvp-score { font-size: 28px; font-weight: bold; margin: 5px 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        .pvp-avatar { height: 60px; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 32px; border: 1px solid rgba(255,255,255,0.2); }
-        .pvp-timer { font-size: 40px; font-weight: bold; text-align: center; background: rgba(0,0,0,0.4); padding: 5px 25px; border-radius: 20px; margin: 10px auto; width: fit-content; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+        .pvp-avatar {
+            height: 60px; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; justify-content: center; align-items: center;
+            font-size: 32px; border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .pvp-timer {
+            font-size: 40px; font-weight: bold; text-align: center; background: rgba(0,0,0,0.4);
+            padding: 5px 25px; border-radius: 20px; margin: 10px auto; width: fit-content;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.2);
+            flex-shrink: 0;
+        }
         .pvp-timer.danger { color: #ff5252; animation: pulse 1s infinite; }
+        
         .pvp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        
         .pvp-word-input { width: 100%; display: flex; gap: 5px; margin-bottom: 5px; }
-        .pvp-word-input input { flex: 1; padding: 12px; border-radius: 8px; border: none; background: rgba(0,0,0,0.5); color: white; font-size: 16px; text-align: center; }
-        .pvp-word-input button { background: var(--btn); border: none; color: white; padding: 0 20px; border-radius: 8px; font-size: 20px; font-weight: bold; }
+        .pvp-word-input input {
+            flex: 1; padding: 12px; border-radius: 8px; border: none;
+            background: rgba(0,0,0,0.5); color: white; font-size: 16px; text-align: center;
+        }
+        .pvp-word-input button {
+            background: var(--btn); border: none; color: white; padding: 0 20px; border-radius: 8px; font-size: 20px; font-weight: bold;
+        }
+
         .pvp-abilities { display: flex; gap: 6px; margin-bottom: 5px; }
-        .pvp-ability-btn { flex: 1; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 8px 0; color: white; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+        .pvp-ability-btn {
+            flex: 1; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 8px; padding: 8px 0; color: white; font-size: 18px; cursor: pointer;
+            display: flex; justify-content: center; align-items: center;
+        }
         .pvp-ability-btn:active { background: rgba(255,255,255,0.3); }
         .pvp-ability-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .rating-display { font-size: 20px; font-weight: bold; color: var(--gold); text-align: center; margin-bottom: 10px; }
-        
-        /* МОДАЛЬНЫЕ ОКНА */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-        .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--bg); padding: 25px; border-radius: 16px; width: 80%; max-width: 300px; text-align: center; border: 1px solid var(--hint); animation: slideIn 0.2s ease-out; max-height: 80vh; overflow-y: auto; }
-        .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--gold); }
-        .modal-input { width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px; border: 1px solid var(--hint); background: var(--secondary-bg); color: var(--text); font-size: 16px; margin-bottom: 15px; text-align: center; outline: none; }
-        .modal-input:focus { border-color: var(--gold); }
-        .modal-buttons { display: flex; gap: 10px; }
-        .modal-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
-        .modal-btn.cancel { background: var(--secondary-bg); color: var(--text); }
-        .modal-btn.confirm { background: var(--gold); color: #000; }
-        .buy-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-        .buy-option { background: var(--secondary-bg); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--hint); cursor: pointer; transition: border-color 0.2s; }
-        .buy-option:active { border-color: var(--gold); }
-        .buy-option-info { text-align: left; }
-        .buy-option-title { font-size: 16px; font-weight: bold; }
-        .buy-option-sub { font-size: 12px; color: var(--hint); }
-        .buy-option-price { background: var(--star); color: #000; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 14px; }
 
-        /* Поиск игры */
+        /* Рейтинг */
+        .rating-display {
+            font-size: 20px; font-weight: bold; color: var(--gold); text-align: center; margin-bottom: 10px;
+        }
+
+        /* Оверлеи и модалки */
         #pvp-search-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); z-index: 100;
@@ -142,6 +225,65 @@
         }
         #pvp-search-overlay.active { display: flex; }
         .search-spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid white; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+
+        #pvp-countdown-overlay {
+            display: none; position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.8); z-index: 200; border-radius: 16px;
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        #countdown-text { font-size: 120px; font-weight: bold; color: var(--gold); text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: var(--bg); padding: 25px; border-radius: 16px;
+            width: 80%; max-width: 300px; text-align: center;
+            border: 1px solid var(--hint); animation: slideIn 0.2s ease-out;
+            max-height: 80vh; overflow-y: auto;
+        }
+        .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--gold); }
+        .modal-input {
+            width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px;
+            border: 1px solid var(--hint); background: var(--secondary-bg); color: var(--text);
+            font-size: 16px; margin-bottom: 15px; text-align: center; outline: none;
+        }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        .modal-btn.cancel { background: var(--secondary-bg); color: var(--text); }
+        .modal-btn.confirm { background: var(--gold); color: #000; }
+
+        /* Магазин */
+        .shop-item {
+            background: var(--secondary-bg); border-radius: 12px; padding: 15px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(128,128,128,0.2);
+        }
+        .shop-item-info { display: flex; flex-direction: column; gap: 5px; }
+        .shop-item-title { font-weight: bold; font-size: 16px; }
+        .shop-item-price { font-size: 14px; color: var(--hint); }
+        .shop-buy-btn {
+            background: var(--btn); color: white; border: none; padding: 10px 15px;
+            border-radius: 8px; font-weight: bold; cursor: pointer;
+        }
+        .shop-buy-btn.stars { background: var(--star); }
+        .shop-buy-btn.diamonds { background: var(--diamond); }
+        
+        .buy-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .buy-option {
+            background: var(--secondary-bg); border-radius: 8px; padding: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid var(--hint); cursor: pointer; transition: border-color 0.2s;
+        }
+        .buy-option:active { border-color: var(--gold); }
+        .buy-option-info { text-align: left; }
+        .buy-option-title { font-size: 16px; font-weight: bold; }
+        .buy-option-sub { font-size: 12px; color: var(--hint); }
+        .buy-option-price {
+            background: var(--star); color: #000; padding: 6px 12px;
+            border-radius: 6px; font-weight: bold; font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -192,6 +334,18 @@
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="closeCurrencyModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ПРИНЯТИЯ ИГРЫ -->
+    <div class="modal-overlay" id="accept-match-modal">
+        <div class="modal-content">
+            <div class="modal-title">Соперник найден!</div>
+            <div style="font-size: 18px; margin-bottom: 20px;">Принять бой?</div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="declineMatch()">Отклонить (-15 рейтинга)</button>
+                <button class="modal-btn confirm" onclick="acceptMatch()">Принять</button>
             </div>
         </div>
     </div>
@@ -319,6 +473,11 @@
                 <button class="btn" style="width: 60%; margin-top: 20px; background: rgba(255,255,255,0.2);" onclick="cancelSearch()">Отмена</button>
             </div>
 
+            <!-- Оверлей отсчета -->
+            <div id="pvp-countdown-overlay">
+                <div id="countdown-text">3</div>
+            </div>
+
             <!-- Враг -->
             <div class="pvp-player enemy">
                 <div class="pvp-name" id="enemy-name">Ожидание...</div>
@@ -332,7 +491,7 @@
 
             <div class="pvp-mid">
                 <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 14px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 8px;" id="pvp-task-text">
-                    Ожидание соперника...
+                    Ожидание...
                 </div>
                 
                 <div class="pvp-word-input">
@@ -374,22 +533,34 @@
         </div>
     </div>
 
-        <script>
+    <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // ВАЖНО: Ссылка на ваш сервер Render
+        // --- НАСТРОЙКИ СЕРВЕРА ---
+        // ВАЖНО: Замените эту ссылку на ваш URL с Render!
         const SERVER_URL = 'https://word-battle-server-xxxx.onrender.com'; 
         
         let socket = null;
-        let pvp = { active: false, isSearching: false, roomId: null };
+        let pvp = { active: false, isSearching: false, roomId: null, isAccepted: false };
 
         let dictionary = new Set();
+        let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
         let coinBalance = parseInt(localStorage.getItem('wordBattleCoins') || '50');
         let diamondBalance = parseInt(localStorage.getItem('wordBattleDiamonds') || '0');
         let playerRating = parseInt(localStorage.getItem('wordBattleRating') || '1000');
-        let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
+        
+        let currentChapterView = 1;
+        let currentWord = "";
+        let selectedTileElements = [];
+        let letterChangeCount = 0;
+        let hintState = 0;
+        let currentHintWord = "";
+        let currentLevelIndex = 1;
+
+        const TOTAL_LEVELS = 100;
+        let allLevels = []; 
 
         function showPopup(title, message) {
             if (tg.showPopup) tg.showPopup({ title, message, buttons: [{ type: 'ok' }] });
@@ -415,15 +586,60 @@
 
             socket.on('searching', () => {
                 document.getElementById('pvp-search-overlay').classList.add('active');
+                pvp.isSearching = true;
             });
 
-            socket.on('match_found', (data) => {
+            socket.on('match_found_pending', (data) => {
                 document.getElementById('pvp-search-overlay').classList.remove('active');
-                pvp.active = true;
                 pvp.roomId = data.roomId;
+                pvp.isAccepted = false;
                 document.getElementById('enemy-name').innerText = data.p2Data.name;
                 document.getElementById('my-name').innerText = data.p1Data.name;
-                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                
+                document.getElementById('accept-match-modal').classList.add('active');
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+            });
+
+            socket.on('waiting_for_opponent', () => {
+                pvp.isAccepted = true;
+                document.getElementById('accept-match-modal').classList.remove('active');
+                showPopup('Ожидание', 'Вы приняли бой. Ждем соперника...');
+            });
+
+            socket.on('opponent_declined', (msg) => {
+                document.getElementById('accept-match-modal').classList.remove('active');
+                showPopup('Соперник сбежал', msg);
+                pvp.active = false;
+                goToMenu();
+            });
+
+            socket.on('match_timeout', (msg) => {
+                document.getElementById('accept-match-modal').classList.remove('active');
+                showPopup('Таймаут', msg);
+                pvp.active = false;
+                goToMenu();
+            });
+
+            socket.on('rating_updated', (newRating) => {
+                playerRating = newRating;
+                updateCurrencyUI();
+            });
+
+            socket.on('countdown_start', (num) => {
+                pvp.active = true;
+                const overlay = document.getElementById('pvp-countdown-overlay');
+                overlay.style.display = 'flex';
+                document.getElementById('countdown-text').innerText = num;
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            });
+
+            socket.on('countdown_tick', (num) => {
+                document.getElementById('countdown-text').innerText = num;
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            });
+
+            socket.on('countdown_end', () => {
+                document.getElementById('pvp-countdown-overlay').style.display = 'none';
             });
 
             socket.on('round_start', (data) => {
@@ -431,7 +647,6 @@
                 document.getElementById('pvp-timer').classList.remove('danger');
                 document.getElementById('pvp-task-text').innerText = data.taskText;
                 
-                // Сброс интерфейса
                 document.getElementById('my-score').innerText = '0';
                 document.getElementById('enemy-score').innerText = '0';
                 document.getElementById('pvp-input').disabled = false;
@@ -442,10 +657,8 @@
                 for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = false;
             });
 
-            socket.on('task_update', (taskText) => {
-                document.getElementById('pvp-task-text').innerText = taskText;
-            });
-
+            socket.on('task_update', (taskText) => document.getElementById('pvp-task-text').innerText = taskText);
+            
             socket.on('timer_update', (time) => {
                 document.getElementById('pvp-timer').innerText = time;
                 if (time <= 5) document.getElementById('pvp-timer').classList.add('danger');
@@ -461,15 +674,13 @@
                 showPopup('Ошибка', msg);
             });
 
-            socket.on('word_success', (word) => {
+            socket.on('word_success', () => {
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 document.getElementById('pvp-input').value = '';
             });
 
             socket.on('ability_used', (data) => {
-                if (data.by !== socket.id) {
-                    showPopup('Соперник использовал способность!', 'Будьте внимательны.');
-                }
+                if (data.by !== socket.id) showPopup('Соперник использовал способность!', 'Будьте внимательны.');
             });
 
             socket.on('round_end', (data) => {
@@ -484,7 +695,6 @@
             socket.on('game_over', (data) => {
                 pvp.active = false;
                 const isWin = data.winnerId === socket.id;
-                
                 let ratingChange = isWin ? 25 : -15;
                 let coinReward = isWin ? 50 : 10;
                 
@@ -492,11 +702,8 @@
                 coinBalance += coinReward;
                 updateCurrencyUI();
 
-                showPopup(
-                    isWin ? '🏆 Победа!' : '💀 Поражение', 
-                    `${isWin ? 'Вы выиграли битву!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`
-                );
-
+                showPopup(isWin ? '🏆 Победа!' : '💀 Поражение', 
+                    `${isWin ? 'Вы выиграли!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`);
                 setTimeout(() => { goToMenu(); switchScreen('screen-rating'); }, 1000);
             });
 
@@ -512,6 +719,19 @@
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             switchScreen('screen-pvp');
             socket.emit('find_match');
+        }
+
+        function acceptMatch() {
+            socket.emit('accept_game');
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function declineMatch() {
+            document.getElementById('accept-match-modal').classList.remove('active');
+            socket.emit('decline_game');
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+            pvp.active = false;
+            goToMenu();
         }
 
         function cancelSearch() {
@@ -539,17 +759,23 @@
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
         }
 
-        // --- ОСТАЛЬНОЙ UI КОД (Уровни, магазин, меню) ---
-        // [Оставьте ваши старые функции switchScreen, goToMenu, showLevelSelect, showShop, showRating, updateMenuUI, loadDictionary и т.д. здесь, они не меняются]
-        
+        // --- ОДИНОЧНАЯ ИГРА И МЕНЮ ---
         function updateCurrencyUI() {
-            document.querySelectorAll('.menu-coins, .levels-coins, .game-coins, .shop-coins').forEach(el => el.innerText = coinBalance);
-            document.querySelectorAll('.menu-diamonds, .levels-diamonds, .game-diamonds, .shop-diamonds').forEach(el => el.innerText = diamondBalance);
+            document.querySelectorAll('.menu-coins, #menu-coins, #levels-coins, #game-coins, #shop-coins').forEach(el => el.innerText = coinBalance);
+            document.querySelectorAll('.menu-diamonds, #menu-diamonds, #levels-diamonds, #game-diamonds, #shop-diamonds').forEach(el => el.innerText = diamondBalance);
             const ratingEl = document.getElementById('my-rating');
             if (ratingEl) ratingEl.innerText = `Ваш рейтинг: ${playerRating}`;
             localStorage.setItem('wordBattleCoins', coinBalance);
             localStorage.setItem('wordBattleDiamonds', diamondBalance);
             localStorage.setItem('wordBattleRating', playerRating);
+        }
+
+        function updateMenuUI() {
+            const startBtn = document.getElementById('btn-start');
+            const resetBtn = document.getElementById('btn-reset');
+            if (maxUnlockedLevel > 1) startBtn.innerText = `🎮 Продолжить (Ур. ${maxUnlockedLevel})`;
+            else startBtn.innerText = `🎮 Одиночный режим`;
+            resetBtn.style.display = maxUnlockedLevel > 1 ? 'block' : 'none';
         }
 
         function switchScreen(screenId) {
@@ -558,18 +784,487 @@
         }
 
         function goToMenu() {
+            if (pvp.active) quitPvP();
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            if (maxUnlockedLevel > 1) document.getElementById('btn-start').innerText = `🎮 Продолжить (Ур. ${maxUnlockedLevel})`;
+            updateMenuUI();
             switchScreen('screen-menu');
         }
-        
+
+        function showLevelSelect() { switchScreen('screen-levels'); renderLevelGrid(); }
+        function showShop() { updateCurrencyUI(); switchScreen('screen-shop'); }
         function showRating() { updateCurrencyUI(); switchScreen('screen-rating'); }
+
+        function openCurrencyModal() {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            document.getElementById('currency-modal').classList.add('active');
+        }
+        function closeCurrencyModal() { document.getElementById('currency-modal').classList.remove('active'); }
         
-        // Запускаем загрузку
-        // (Ваша функция loadDictionary, которая убирает спиннер и т.д.)
+        function buyPackage(id, stars, coins, diamonds) {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            showPopup('Покупка', `Это тестовый режим. Начислено ${coins} 🪙 и ${diamonds} 💎!`);
+            coinBalance += coins;
+            diamondBalance += diamonds;
+            updateCurrencyUI();
+            closeCurrencyModal();
+        }
+
+        function buyCoinsWithDiamonds() {
+            if (diamondBalance < 2) return showPopup('Ошибка', 'Недостаточно алмазов!');
+            diamondBalance -= 2;
+            coinBalance += 100;
+            updateCurrencyUI();
+            showPopup('Успех', 'Вы обменяли 2 💎 на 100 🪙!');
+        }
+
+        // --- АДМИНКА ---
+        let adminTapCount = 0;
+        let adminTapTimer;
+        function handleAdminTap() {
+            adminTapCount++;
+            clearTimeout(adminTapTimer);
+            adminTapTimer = setTimeout(() => { adminTapCount = 0; }, 1500);
+            if (adminTapCount >= 5) { adminTapCount = 0; openAdminModal(); }
+        }
+        function openAdminModal() {
+            document.getElementById('admin-password-input').value = '';
+            document.getElementById('admin-modal').classList.add('active');
+        }
+        function closeAdminModal() { document.getElementById('admin-modal').classList.remove('active'); }
+        function checkAdminPassword() {
+            if (document.getElementById('admin-password-input').value.trim() === 'Alabamagranda') {
+                closeAdminModal();
+                maxUnlockedLevel = 100;
+                localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
+                coinBalance += 5000;
+                diamondBalance += 100;
+                playerRating += 500;
+                updateCurrencyUI();
+                updateMenuUI();
+                showPopup('👑 Админ-режим', 'Все уровни открыты, начислены валюты и рейтинг!');
+            } else {
+                showPopup('❌ Ошибка', 'Неверный пароль!');
+            }
+        }
+
+        // --- ТЕМА ---
+        function initTheme() {
+            const saved = localStorage.getItem('wordBattleTheme') || 'dark';
+            document.documentElement.setAttribute('data-theme', saved);
+            document.getElementById('theme-toggle').innerText = saved === 'dark' ? '☀️' : '🌙';
+        }
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('wordBattleTheme', next);
+            document.getElementById('theme-toggle').innerText = next === 'dark' ? '☀️' : '🌙';
+        }
+        initTheme();
+
+        // --- ЗАГРУЗКА СЛОВАРЯ И ГЕНЕРАЦИЯ УРОВНЕЙ ---
+        async function loadDictionary() {
+            try {
+                const response = await fetch('words.txt.gz?v=' + Date.now());
+                if (!response.ok) throw new Error('Файл не найден');
+                
+                let arrayBuffer;
+                if (typeof DecompressionStream !== 'undefined') {
+                    const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
+                    const text = await new Response(stream).text();
+                    dictionary = new Set(text.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
+                } else {
+                    // Fallback для очень старых браузеров
+                    const buffer = await response.arrayBuffer();
+                    const text = pako.inflate(new Uint8Array(buffer), { to: 'string' });
+                    dictionary = new Set(text.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
+                }
+
+                generateLevels();
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('btn-start').disabled = false;
+                updateCurrencyUI();
+                updateMenuUI();
+            } catch (error) {
+                document.getElementById('loading-text').innerText = 'Ошибка словаря';
+                console.error(error);
+            }
+        }
+
+        function generateLevels() {
+            allLevels = [];
+            const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
+            const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
+            
+            for (let i = 1; i <= 50; i++) {
+                let type, val, text, target;
+                if (i <= 10) {
+                    const idx = i - 1;
+                    if (i <= 4) { type = 'startsWith'; val = lettersStart[idx]; text = `Начинается на "${val.toUpperCase()}"`; target = 3; }
+                    else if (i <= 7) { type = 'endsWith'; val = lettersEnd[idx - 4]; text = `Заканчивается на "${val.toUpperCase()}"`; target = 3; }
+                    else { type = 'length'; val = 4 + (idx - 7); text = `Ровно ${val} букв`; target = 3; }
+                } else if (i <= 30) {
+                    const idx = i - 11;
+                    if (i <= 18) { type = 'startsWith'; val = lettersStart[idx % lettersStart.length]; text = `Начинается на "${val.toUpperCase()}"`; target = 4; }
+                    else if (i <= 25) { type = 'endsWith'; val = lettersEnd[idx % lettersEnd.length]; text = `Заканчивается на "${val.toUpperCase()}"`; target = 4; }
+                    else { type = 'length'; val = 5 + (idx % 4); text = `Ровно ${val} букв`; target = 4; }
+                } else {
+                    const idx = i - 31;
+                    if (i <= 38) { type = 'contains'; val = lettersEnd[idx % lettersEnd.length]; text = `Содержит "${val.toUpperCase()}"`; target = 4; }
+                    else if (i <= 45) { type = 'startsWith'; val = lettersStart[idx % lettersStart.length]; text = `Начинается на "${val.toUpperCase()}"`; target = 5; }
+                    else { type = 'length'; val = 7 + (idx % 3); text = `Ровно ${val} букв`; target = 5; }
+                }
+                allLevels.push({ type, val, text, target });
+            }
+
+            const wordsArray = Array.from(dictionary);
+            const vowels = 'аеиоуыэюя';
+            const consonants = 'бвгджзклмнпрстфхцчшщ';
+            const condTypes = ['length', 'startsWith', 'endsWith', 'contains', 'any'];
+            
+            for (let i = 51; i <= 100; i++) {
+                const idx = i - 51;
+                const target = 3 + Math.floor(idx / 17);
+                const poolSize = 8 + Math.floor(idx / 10); 
+                
+                let baseWord = "";
+                while (baseWord.length < 4 || baseWord.length > 7) {
+                    baseWord = wordsArray[Math.floor(Math.random() * wordsArray.length)] || 'слово';
+                }
+                
+                let pool = baseWord.split('');
+                while (pool.length < poolSize) {
+                    pool.push(Math.random() < 0.4 ? vowels[Math.floor(Math.random() * vowels.length)] : consonants[Math.floor(Math.random() * consonants.length)]);
+                }
+                pool.sort(() => Math.random() - 0.5);
+
+                const condType = condTypes[idx % condTypes.length];
+                let conditionVal = null;
+                let text = "";
+
+                if (condType === 'any') text = `Составь ${target} любых слова`;
+                else if (condType === 'length') { conditionVal = baseWord.length; text = `Составь ${target} слова ровно из ${conditionVal} букв`; }
+                else if (condType === 'startsWith') { conditionVal = baseWord[0]; text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`; }
+                else if (condType === 'endsWith') { conditionVal = baseWord[baseWord.length - 1]; text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`; }
+                else if (condType === 'contains') { conditionVal = baseWord[Math.floor(Math.random() * baseWord.length)]; text = `Составь ${target} слова с буквой "${conditionVal.toUpperCase()}"`; }
+
+                allLevels.push({ type: 'letters', val: pool, condType, condVal: conditionVal, text, target });
+            }
+        }
+
+        // --- ОДИНОЧНАЯ ИГРА ЛОГИКА ---
+        function switchChapter(chapter) {
+            currentChapterView = chapter;
+            document.getElementById('tab-ch1').classList.toggle('active', chapter === 1);
+            document.getElementById('tab-ch2').classList.toggle('active', chapter === 2);
+            renderLevelGrid();
+        }
+
+        function renderLevelGrid() {
+            const grid = document.getElementById('level-grid');
+            grid.innerHTML = '';
+            const start = currentChapterView === 1 ? 1 : 51;
+            const end = currentChapterView === 1 ? 50 : 100;
+
+            for (let i = start; i <= end; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'level-btn';
+                btn.innerText = i;
+                if (i < maxUnlockedLevel) btn.classList.add('completed');
+                else if (i === maxUnlockedLevel) btn.classList.add('current');
+                else { btn.classList.add('locked'); btn.innerHTML = '🔒'; }
+
+                if (i <= maxUnlockedLevel) btn.onclick = () => startLevel(i);
+                else btn.onclick = () => showPopup('Закрыто', 'Сначала пройди предыдущие уровни!');
+                grid.appendChild(btn);
+            }
+        }
+
+        function startLevel(levelIndex) {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            currentLevelIndex = levelIndex;
+            switchScreen('screen-game');
+            loadLevel();
+        }
+
+        function confirmLeaveLevel() {
+            if (enteredWords.length === 0 && currentWord === "") { showLevelSelect(); return; }
+            tg.showPopup({
+                title: 'Выход', message: 'Вы точно хотите покинуть уровень? Весь прогресс будет утерян.',
+                buttons: [ { id: 'cancel', type: 'cancel', text: 'Остаться' }, { id: 'leave', type: 'destructive', text: 'Выйти' } ]
+            }, (btnId) => { if (btnId === 'leave') showLevelSelect(); });
+        }
+
+        let enteredWords = []; // Перенесено сюда для области видимости
+        function loadLevel() {
+            enteredWords = [];
+            currentWord = "";
+            selectedTileElements = [];
+            letterChangeCount = 0;
+            hintState = 0;
+            currentHintWord = "";
+            
+            document.getElementById('words-container').innerHTML = '';
+            document.getElementById('word-input').value = '';
+            document.getElementById('current-word-display').innerText = '';
+
+            const level = allLevels[currentLevelIndex - 1];
+            document.getElementById('level-display').innerText = `Уровень ${currentLevelIndex}`;
+            document.getElementById('current-task').innerText = level.text;
+
+            const poolContainer = document.getElementById('letters-pool');
+            const taskTitle = document.getElementById('task-title-text');
+            const keyboardGroup = document.getElementById('keyboard-input-group');
+            const tilesContainer = document.getElementById('tiles-container');
+            const ch1Actions = document.getElementById('ch1-actions');
+            const ch2Actions = document.getElementById('ch2-actions');
+
+            if (level.type === 'letters') {
+                taskTitle.innerText = "Твоё задание:";
+                keyboardGroup.style.display = 'none';
+                tilesContainer.style.display = 'flex';
+                ch1Actions.style.display = 'none';
+                ch2Actions.style.display = 'flex';
+                poolContainer.innerHTML = '';
+                
+                const hintBtn = document.getElementById('btn-hint');
+                hintBtn.className = 'action-btn hint-btn';
+                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+
+                level.val.forEach((letter) => {
+                    const tile = document.createElement('div');
+                    tile.className = 'letter-tile';
+                    tile.innerText = letter;
+                    tile.dataset.letter = letter;
+                    tile.onclick = () => clickTile(tile, letter);
+                    poolContainer.appendChild(tile);
+                });
+            } else {
+                taskTitle.innerText = "Твоё задание:";
+                keyboardGroup.style.display = 'flex';
+                tilesContainer.style.display = 'none';
+                ch1Actions.style.display = 'flex';
+                ch2Actions.style.display = 'none';
+                
+                const changeBtn = document.getElementById('btn-change-letter');
+                changeBtn.innerHTML = 'Сменить букву <span>(15 🪙)</span>';
+                changeBtn.style.color = 'var(--gold)';
+                changeBtn.style.borderColor = 'var(--gold)';
+                changeBtn.style.background = 'rgba(212, 175, 55, 0.1)';
+            }
+            updateProgress();
+        }
+
+        function clickTile(tileEl, letter) {
+            if (tileEl.classList.contains('used')) return;
+            currentWord += letter;
+            tileEl.classList.add('used');
+            selectedTileElements.push(tileEl);
+            document.getElementById('current-word-display').innerText = currentWord;
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function backspaceTile() {
+            if (selectedTileElements.length === 0) return;
+            const lastTile = selectedTileElements.pop();
+            lastTile.classList.remove('used');
+            currentWord = currentWord.slice(0, -1);
+            if (currentWord === "") {
+                hintState = 0; currentHintWord = "";
+                const hintBtn = document.getElementById('btn-hint');
+                hintBtn.className = 'action-btn hint-btn';
+                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+            }
+            document.getElementById('current-word-display').innerText = currentWord;
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function submitTileWord() { if (currentWord) checkWord(currentWord, true); }
+
+        function getHint() {
+            if (hintState === 2) return showPopup('Внимание', 'Вы уже полностью открыли это слово.');
+            const btn = document.getElementById('btn-hint');
+
+            if (hintState === 0) {
+                if (coinBalance < 20) return showPopup('Ошибка', 'Недостаточно монет! Подсказка стоит 20 🪙.');
+                const originalText = btn.innerText;
+                btn.innerText = '⏳ Поиск...';
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+                setTimeout(() => {
+                    try {
+                        const level = allLevels[currentLevelIndex - 1];
+                        let candidates = [];
+                        for (const w of dictionary) {
+                            if (w.length < 4 || enteredWords.includes(w) || !canFormFromLetters(w, level.val)) continue;
+                            if (level.condType === 'length' && w.length !== level.condVal) continue;
+                            if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
+                            if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
+                            if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
+                            candidates.push(w);
+                        }
+                        if (candidates.length === 0) {
+                            btn.innerText = originalText;
+                            return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих под условие слов нет.');
+                        }
+                        candidates.sort((a, b) => b.length - a.length);
+                        let bestWord = null;
+                        for (const w of candidates) {
+                            const hintPart = w.slice(0, Math.ceil(w.length / 2));
+                            if (!enteredWords.some(ew => ew.startsWith(hintPart))) { bestWord = w; break; }
+                        }
+                        if (!bestWord) {
+                            btn.innerText = originalText;
+                            return showPopup('Не найдено', 'Все оставшиеся слова начинаются с тех же букв, что вы уже вводили. Попробуйте угадать сами!');
+                        }
+                        currentHintWord = bestWord;
+                        const hintPart = bestWord.slice(0, Math.ceil(bestWord.length / 2));
+                        currentWord = "";
+                        selectedTileElements.forEach(el => el.classList.remove('used'));
+                        selectedTileElements = [];
+                        document.getElementById('current-word-display').innerText = '';
+                        for (let char of hintPart) {
+                            const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.dataset.letter === char && !el.classList.contains('used'));
+                            if (tile) clickTile(tile, char);
+                        }
+                        btn.className = 'action-btn hint-btn diamond-mode';
+                        btn.innerText = '💎 Доп. подсказка (1 💎)';
+                        coinBalance -= 20; updateCurrencyUI();
+                        hintState = 1;
+                        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    } catch (e) { btn.innerText = originalText; }
+                }, 50);
+            } else if (hintState === 1) {
+                tg.showPopup({
+                    title: 'Покупка', message: 'Вы точно хотите потратить 1 алмаз 💎, чтобы увидеть конец слова?',
+                    buttons: [ { id: 'cancel', type: 'cancel', text: 'Отмена' }, { id: 'buy', type: 'default', text: 'Купить 💎' } ]
+                }, (btnId) => {
+                    if (btnId === 'buy') {
+                        if (diamondBalance < 1) return showPopup('Ошибка', 'Недостаточно алмазов!');
+                        const halfLength = Math.ceil(currentHintWord.length / 2);
+                        const hintPart = currentHintWord.slice(halfLength);
+                        for (let char of hintPart) {
+                            const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.dataset.letter === char && !el.classList.contains('used'));
+                            if (tile) clickTile(tile, char);
+                        }
+                        diamondBalance -= 1; updateCurrencyUI();
+                        btn.className = 'action-btn hint-btn';
+                        btn.innerText = '✅ Слово собрано';
+                        hintState = 2;
+                    }
+                });
+            }
+        }
+
+        function canFormFromLetters(word, letters) {
+            const poolCount = {};
+            for (let char of letters) poolCount[char] = (poolCount[char] || 0) + 1;
+            for (let char of word) {
+                if (!poolCount[char]) return false;
+                poolCount[char]--;
+            }
+            return true;
+        }
+
+        function changeLetter() {
+            const btn = document.getElementById('btn-change-letter');
+            if (letterChangeCount === 0) {
+                if (coinBalance < 15) return tg.showAlert('Недостаточно монет! Смена буквы стоит 15 🪙.');
+                const newLetter = prompt("Введите новую букву:");
+                if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+                const level = allLevels[currentLevelIndex - 1];
+                level.type = 'startsWith'; level.val = newLetter.toLowerCase(); level.text = `Начинается на "${newLetter.toUpperCase()}"`;
+                document.getElementById('current-task').innerText = level.text;
+                coinBalance -= 15; updateCurrencyUI(); letterChangeCount++;
+                btn.innerHTML = 'Сменить букву <span>(1 💎)</span>';
+                btn.style.color = 'var(--diamond)'; btn.style.borderColor = 'var(--diamond)'; btn.style.background = 'rgba(0, 191, 255, 0.1)';
+            } else {
+                tg.showPopup({
+                    title: 'Смена буквы', message: 'Следующая смена будет стоить 1 алмаз 💎. Вы согласны?',
+                    buttons: [ { id: 'cancel', type: 'cancel', text: 'Отмена' }, { id: 'buy', type: 'default', text: 'Купить 💎' } ]
+                }, (btnId) => {
+                    if (btnId === 'buy') {
+                        if (diamondBalance < 1) return tg.showAlert('Недостаточно алмазов!');
+                        const newLetter = prompt("Введите новую букву:");
+                        if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+                        const level = allLevels[currentLevelIndex - 1];
+                        level.type = 'startsWith'; level.val = newLetter.toLowerCase(); level.text = `Начинается на "${newLetter.toUpperCase()}"`;
+                        document.getElementById('current-task').innerText = level.text;
+                        diamondBalance -= 1; updateCurrencyUI();
+                    }
+                });
+            }
+        }
+
+        function updateProgress() {
+            const level = allLevels[currentLevelIndex - 1];
+            document.getElementById('progress-text').innerText = `Введено: ${enteredWords.length} / ${level.target}`;
+        }
+
+        function checkWord(wordStr = null, isTileMode = false) {
+            const input = document.getElementById('word-input');
+            let rawWord = isTileMode ? wordStr : input.value.trim();
+            const word = rawWord.toLowerCase().replace(/ё/g, 'е').replace(/[^а-я]/g, '');
+            if (!word) return;
+            if (!dictionary.has(word)) { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error'); return; }
+            
+            const level = allLevels[currentLevelIndex - 1];
+            if (level.type === 'letters') {
+                if (level.condType === 'length' && word.length !== level.condVal) return;
+                if (level.condType === 'startsWith' && !word.startsWith(level.condVal)) return;
+                if (level.condType === 'endsWith' && !word.endsWith(level.condVal)) return;
+                if (level.condType === 'contains' && !word.includes(level.condVal)) return;
+            } else {
+                let isValid = false;
+                if (level.type === 'startsWith') isValid = word.startsWith(level.val);
+                else if (level.type === 'endsWith') isValid = word.endsWith(level.val);
+                else if (level.type === 'contains') isValid = word.includes(level.val);
+                else if (level.type === 'length') isValid = word.length === level.val;
+                if (!isValid) return;
+            }
+
+            if (enteredWords.includes(word)) { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning'); return; }
+
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            enteredWords.push(word);
+            if (isTileMode) {
+                currentWord = ""; selectedTileElements.forEach(el => el.classList.remove('used')); selectedTileElements = [];
+                hintState = 0; currentHintWord = "";
+                const hintBtn = document.getElementById('btn-hint');
+                hintBtn.className = 'action-btn hint-btn'; hintBtn.innerText = '💡 Подсказка (20 🪙)';
+                document.getElementById('current-word-display').innerText = '';
+            } else { input.value = ''; }
+            
+            const wordItem = document.createElement('div');
+            wordItem.className = 'word-item';
+            wordItem.innerHTML = `<span>${rawWord}</span> <span>+1</span>`;
+            document.getElementById('words-container').prepend(wordItem);
+
+            updateProgress();
+
+            if (enteredWords.length >= level.target) {
+                if (currentLevelIndex === maxUnlockedLevel) {
+                    coinBalance += 25; maxUnlockedLevel++;
+                    localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
+                    updateCurrencyUI();
+                    setTimeout(() => { tg.showAlert('Уровень пройден! +25 🪙'); showLevelSelect(); }, 300);
+                } else {
+                    setTimeout(() => { tg.showAlert('Уровень пройден!'); showLevelSelect(); }, 300);
+                }
+            }
+        }
+
+        document.getElementById('word-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') checkWord(null, false); });
+        document.getElementById('pvp-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') submitPvPWord(); });
+
+        // Инициализация
         document.getElementById('loading-screen').style.display = 'none'; 
         document.getElementById('btn-start').disabled = false;
         updateCurrencyUI();
+        updateMenuUI();
+        
+        // Попытка загрузить словарь (для одиночной игры)
+        loadDictionary();
     </script>
 </body>
 </html>
