@@ -17,6 +17,7 @@
             --danger: #e53935;
             --success: #4CAF50;
             --gold: #FFD700;
+            --diamond: #00BFFF;
             --locked-bg: #2c3947;
             --tile-bg: #e2b714;
             --tile-text: #17212b;
@@ -33,6 +34,7 @@
             --danger: #d32f2f;
             --success: #388e3c;
             --gold: #d4af37;
+            --diamond: #0088cc;
             --locked-bg: #e0e0e0;
             --tile-bg: #f0d470;
             --tile-text: #000000;
@@ -55,7 +57,13 @@
         .menu-title { font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin: 0; cursor: pointer; user-select: none; }
         .theme-toggle { position: absolute; right: 0; background: none; border: none; font-size: 24px; cursor: pointer; padding: 5px; color: var(--text); z-index: 10; }
         
-        .balance { font-size: 18px; color: var(--gold); text-align: center; margin-bottom: 20px; font-weight: bold; }
+        .balance {
+            display: flex; justify-content: center; gap: 20px; font-size: 18px; font-weight: bold;
+            margin-bottom: 20px; background: var(--secondary-bg); padding: 10px 20px; border-radius: 20px;
+        }
+        .balance span.gold { color: var(--gold); }
+        .balance span.diamond { color: var(--diamond); }
+
         .btn {
             background-color: var(--btn); color: var(--btn-text);
             border: none; padding: 16px; border-radius: 12px;
@@ -66,6 +74,7 @@
         .btn:disabled { opacity: 0.5; background-color: var(--hint); cursor: not-allowed; }
         .btn-secondary { background-color: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
         .btn-pvp { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .btn-shop { background: linear-gradient(135deg, #00BFFF 0%, #1E90FF 100%); color: white; }
         .btn-reset { background: transparent; color: var(--danger); border: 1px solid var(--danger); font-size: 14px; margin-top: auto; margin-bottom: 20px; }
 
         /* Выбор уровней */
@@ -92,7 +101,10 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0; }
         .back-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); padding: 0; }
         .level-info { font-size: 18px; font-weight: bold; }
-        .bonus-badge { color: var(--gold); font-weight: bold; font-size: 16px; }
+        
+        .game-balance { display: flex; gap: 10px; font-size: 14px; font-weight: bold; }
+        .game-balance span.gold { color: var(--gold); }
+        .game-balance span.diamond { color: var(--diamond); }
 
         .task-card {
             background-color: var(--secondary-bg); padding: 15px; border-radius: 16px;
@@ -109,8 +121,11 @@
         }
         .action-btn span { font-size: 10px; opacity: 0.8; }
         
-        .hint-btn {
-            width: 100%; flex: none; padding: 12px; font-size: 14px; flex-direction: row; gap: 10px;
+        .hint-btn { 
+            width: 100%; flex: none; padding: 12px; font-size: 14px; flex-direction: row; gap: 10px; 
+        }
+        .hint-btn.diamond-mode {
+            background: rgba(0, 191, 255, 0.1); color: var(--diamond); border-color: var(--diamond);
         }
 
         /* Ввод для Главы 1 */
@@ -135,12 +150,9 @@
             color: var(--btn); margin-bottom: 20px; text-transform: uppercase;
             border-bottom: 2px dashed var(--hint); padding-bottom: 5px; min-width: 50px; text-align: center;
         }
-        .letters-pool {
-            display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px;
-        }
+        .letters-pool { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
         .letter-tile {
-            width: 55px; height: 55px; border-radius: 12px;
-            background: var(--tile-bg); color: var(--tile-text);
+            width: 55px; height: 55px; border-radius: 12px; background: var(--tile-bg); color: var(--tile-text);
             font-size: 26px; font-weight: bold; display: flex; justify-content: center; align-items: center;
             cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.2); user-select: none;
             text-transform: uppercase; transition: all 0.1s;
@@ -149,9 +161,7 @@
         .letter-tile.used { background: var(--tile-used); color: var(--hint); box-shadow: none; transform: translateY(4px); cursor: default; }
         
         .tile-controls { display: flex; gap: 15px; width: 100%; justify-content: center; }
-        .tile-btn {
-            padding: 12px 24px; border-radius: 12px; font-size: 18px; font-weight: bold; border: none; cursor: pointer;
-        }
+        .tile-btn { padding: 12px 24px; border-radius: 12px; font-size: 18px; font-weight: bold; border: none; cursor: pointer; }
         .tile-btn.backspace { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
         .tile-btn.submit { background: var(--success); color: white; flex: 1; max-width: 200px; }
 
@@ -175,15 +185,29 @@
         @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* PvP */
+        /* PvP Заглушка */
         .pvp-mockup { flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, #2b1055 0%, #7597de 100%); border-radius: 16px; padding: 20px; text-align: center; color: white; }
         .pvp-timer { font-size: 32px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; margin: 0 auto 10px auto; width: fit-content; }
+
+        /* Магазин (Shop) */
+        .shop-item {
+            background: var(--secondary-bg); border-radius: 12px; padding: 15px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(128,128,128,0.2);
+        }
+        .shop-item-info { display: flex; flex-direction: column; gap: 5px; }
+        .shop-item-title { font-weight: bold; font-size: 16px; }
+        .shop-item-price { font-size: 14px; color: var(--hint); }
+        .shop-buy-btn {
+            background: var(--btn); color: white; border: none; padding: 10px 15px;
+            border-radius: 8px; font-weight: bold; cursor: pointer;
+        }
+        .shop-buy-btn.stars { background: #f39c12; }
+        .shop-buy-btn.diamonds { background: var(--diamond); }
 
         /* МОДАЛЬНОЕ ОКНО ДЛЯ АДМИНКИ */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); z-index: 1000;
-            justify-content: center; align-items: center; backdrop-filter: blur(3px);
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px);
         }
         .modal-overlay.active { display: flex; }
         .modal-content {
@@ -230,10 +254,14 @@
             <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">☀️</button>
         </div>
         
-        <div class="balance">🪙 <span id="menu-balance">0</span> бонусов</div>
+        <div class="balance">
+            <span class="gold">🪙 <span id="menu-coins">0</span></span>
+            <span class="diamond">💎 <span id="menu-diamonds">0</span></span>
+        </div>
         
         <button id="btn-start" class="btn" onclick="showLevelSelect()" disabled>Загрузка...</button>
         <button class="btn btn-pvp" onclick="showPvpMockup()">⚔️ Один на один (PvP)</button>
+        <button class="btn btn-shop" onclick="showShop()">💎 Магазин</button>
         <button class="btn btn-secondary" onclick="tg.showAlert('Рейтинг и турниры в разработке!')">🏆 Рейтинг игроков</button>
         
         <button id="btn-reset" class="btn btn-reset" onclick="resetProgress()" style="display: none;">Сбросить прогресс</button>
@@ -244,7 +272,10 @@
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
             <div class="level-info">Выбор уровня</div>
-            <div class="bonus-badge">🪙 <span id="levels-balance">0</span></div>
+            <div class="game-balance">
+                <span class="gold">🪙 <span id="levels-coins">0</span></span>
+                <span class="diamond">💎 <span id="levels-diamonds">0</span></span>
+            </div>
         </div>
         
         <div class="tabs">
@@ -260,7 +291,10 @@
         <div class="header">
             <button class="back-btn" onclick="confirmLeaveLevel()">←</button>
             <div class="level-info" id="level-display">Уровень 1</div>
-            <div class="bonus-badge">🪙 <span id="game-balance">0</span></div>
+            <div class="game-balance">
+                <span class="gold">🪙 <span id="game-coins">0</span></span>
+                <span class="diamond">💎 <span id="game-diamonds">0</span></span>
+            </div>
         </div>
 
         <div class="task-card">
@@ -268,13 +302,13 @@
             <div class="task-word" id="current-task">Загрузка...</div>
         </div>
 
+        <!-- Оставлена только кнопка смены буквы для 1 главы -->
         <div class="action-buttons" id="ch1-actions">
-            <button class="action-btn" onclick="changeLetter()">Сменить букву <span>(10 🪙)</span></button>
-            <button class="action-btn" onclick="changeCondition()">Сменить условие <span>(15 🪙)</span></button>
+            <button class="action-btn" id="btn-change-letter" onclick="changeLetter()">Сменить букву <span>(15 🪙)</span></button>
         </div>
 
         <div class="action-buttons" id="ch2-actions" style="display: none;">
-            <button class="action-btn hint-btn" onclick="getHint()">💡 Подсказка (20 🪙)</button>
+            <button class="action-btn hint-btn" id="btn-hint" onclick="getHint()">💡 Подсказка (20 🪙)</button>
         </div>
 
         <div class="input-group" id="keyboard-input-group">
@@ -295,7 +329,49 @@
         <div class="progress" id="progress-text">Введено: 0 / 0</div>
     </div>
 
-    <!-- ЭКРАН 4: PvP Заглушка -->
+    <!-- ЭКРАН 4: Магазин -->
+    <div id="screen-shop" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="goToMenu()">←</button>
+            <div class="level-info">Магазин</div>
+            <div class="game-balance">
+                <span class="gold">🪙 <span id="shop-coins">0</span></span>
+                <span class="diamond">💎 <span id="shop-diamonds">0</span></span>
+            </div>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto;">
+            <div class="shop-item">
+                <div class="shop-item-info">
+                    <div class="shop-item-title">100 Монет 🪙</div>
+                    <div class="shop-item-price">Обменять на алмазы</div>
+                </div>
+                <button class="shop-buy-btn diamonds" onclick="buyCoinsWithDiamonds()">2 💎</button>
+            </div>
+
+            <div class="shop-item">
+                <div class="shop-item-info">
+                    <div class="shop-item-title">50 Алмазов 💎</div>
+                    <div class="shop-item-price">Покупка за Звезды</div>
+                </div>
+                <button class="shop-buy-btn stars" onclick="buyDiamondsWithStars(50, 10)">10 ⭐</button>
+            </div>
+
+            <div class="shop-item">
+                <div class="shop-item-info">
+                    <div class="shop-item-title">150 Алмазов 💎</div>
+                    <div class="shop-item-price">Покупка за Звезды (выгодно)</div>
+                </div>
+                <button class="shop-buy-btn stars" onclick="buyDiamondsWithStars(150, 25)">25 ⭐</button>
+            </div>
+            
+            <div style="text-align: center; color: var(--hint); font-size: 12px; margin-top: 20px;">
+                * Звезды Telegram обрабатываются через защищенный шлюз платежей.
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 5: PvP Заглушка -->
     <div id="screen-pvp" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
@@ -327,12 +403,20 @@
         
         let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
         let currentLevelIndex = 1;
-        let bonusBalance = parseInt(localStorage.getItem('wordBattleBonus') || '50');
+        
+        // Валюты
+        let coinBalance = parseInt(localStorage.getItem('wordBattleCoins') || '50');
+        let diamondBalance = parseInt(localStorage.getItem('wordBattleDiamonds') || '0');
+        
         let currentChapterView = 1;
 
         let currentWord = "";
         let selectedTileElements = [];
-        let hintUsedForCurrentWord = false;
+        
+        // Переменные для способностей
+        let letterChangeCount = 0; // Сколько раз меняли букву на текущем уровне
+        let hintState = 0; // 0 - нет, 1 - куплена первая половина, 2 - слово собрано
+        let currentHintWord = ""; // Слово, которое было выбрано для подсказки
 
         const TOTAL_LEVELS = 100;
         let allLevels = []; 
@@ -344,6 +428,52 @@
             } else {
                 tg.showAlert(message);
             }
+        }
+
+        // --- ОБНОВЛЕНИЕ ВАЛЮТ ---
+        function updateCurrencyUI() {
+            // Меню
+            document.getElementById('menu-coins').innerText = coinBalance;
+            document.getElementById('menu-diamonds').innerText = diamondBalance;
+            // Выбор уровней
+            document.getElementById('levels-coins').innerText = coinBalance;
+            document.getElementById('levels-diamonds').innerText = diamondBalance;
+            // Игра
+            document.getElementById('game-coins').innerText = coinBalance;
+            document.getElementById('game-diamonds').innerText = diamondBalance;
+            // Магазин
+            document.getElementById('shop-coins').innerText = coinBalance;
+            document.getElementById('shop-diamonds').innerText = diamondBalance;
+
+            // Сохранение
+            localStorage.setItem('wordBattleCoins', coinBalance);
+            localStorage.setItem('wordBattleDiamonds', diamondBalance);
+        }
+
+        // --- МАГАЗИН ---
+        function showShop() {
+            if (tg.HapticFeedback && tg.HapticFeedback.impactOccurred) tg.HapticFeedback.impactOccurred('light');
+            updateCurrencyUI();
+            switchScreen('screen-shop');
+        }
+
+        function buyCoinsWithDiamonds() {
+            if (diamondBalance < 2) return showPopup('Ошибка', 'Недостаточно алмазов!');
+            diamondBalance -= 2;
+            coinBalance += 100;
+            updateCurrencyUI();
+            if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+            showPopup('Успех', 'Вы обменяли 2 💎 на 100 🪙!');
+        }
+
+        function buyDiamondsWithStars(diamonds, stars) {
+            if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+            showPopup(
+                'Покупка', 
+                `Это тестовый режим. В реальной игре вы бы заплатили ${stars} ⭐ и получили ${diamonds} 💎.\n\nАлмазы уже начислены на ваш счет!`
+            );
+            diamondBalance += diamonds;
+            updateCurrencyUI();
         }
 
         // --- СЕКРЕТНАЯ АДМИНКА ---
@@ -378,12 +508,12 @@
                 closeAdminModal();
                 maxUnlockedLevel = 100;
                 localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
-                bonusBalance += 5000;
-                updateBalanceUI();
-                updateMenuUI();
+                coinBalance += 5000;
+                diamondBalance += 100;
+                updateCurrencyUI();
                 
                 if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
-                showPopup('👑 Админ-режим', 'Пароль верный! Все 100 уровней открыты. Начислено 5000 монет.');
+                showPopup('👑 Админ-режим', 'Пароль верный! Все 100 уровней открыты. Начислено 5000 🪙 и 100 💎.');
             } else {
                 if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('error');
                 showPopup('❌ Ошибка', 'Неверный пароль!');
@@ -504,11 +634,6 @@
             return true;
         }
 
-        function updateBalanceUI() {
-            document.querySelectorAll('#menu-balance, #levels-balance, #game-balance').forEach(el => el.innerText = bonusBalance);
-            localStorage.setItem('wordBattleBonus', bonusBalance);
-        }
-
         function updateMenuUI() {
             const startBtn = document.getElementById('btn-start');
             const resetBtn = document.getElementById('btn-reset');
@@ -557,7 +682,7 @@
                 document.getElementById('loading-screen').style.display = 'none';
                 document.getElementById('btn-start').disabled = false;
                 
-                updateBalanceUI();
+                updateCurrencyUI();
                 updateMenuUI();
             } catch (error) {
                 console.error(error);
@@ -595,15 +720,15 @@
         function resetProgress() {
             tg.showPopup({
                 title: 'Сброс',
-                message: 'Вы уверены, что хотите сбросить весь прогресс и бонусы?',
+                message: 'Вы уверены, что хотите сбросить весь прогресс и валюты?',
                 buttons: [ { id: 'cancel', type: 'cancel', text: 'Отмена' }, { id: 'reset', type: 'destructive', text: 'Сбросить' } ]
             }, (buttonId) => {
                 if (buttonId === 'reset') {
                     maxUnlockedLevel = 1;
-                    bonusBalance = 50;
+                    coinBalance = 50;
+                    diamondBalance = 0;
                     localStorage.setItem('wordBattleMaxUnlocked', 1);
-                    localStorage.setItem('wordBattleBonus', 50);
-                    updateBalanceUI();
+                    updateCurrencyUI();
                     updateMenuUI();
                     if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
                 }
@@ -669,7 +794,12 @@
             enteredWords = [];
             currentWord = "";
             selectedTileElements = [];
-            hintUsedForCurrentWord = false;
+            
+            // Сброс способностей
+            letterChangeCount = 0;
+            hintState = 0;
+            currentHintWord = "";
+            
             document.getElementById('words-container').innerHTML = '';
             document.getElementById('word-input').value = '';
             document.getElementById('current-word-display').innerText = '';
@@ -693,11 +823,16 @@
                 ch2Actions.style.display = 'flex';
                 poolContainer.innerHTML = '';
                 
+                // Восстанавливаем кнопку подсказки
+                const hintBtn = document.getElementById('btn-hint');
+                hintBtn.className = 'action-btn hint-btn';
+                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+
                 level.val.forEach((letter) => {
                     const tile = document.createElement('div');
                     tile.className = 'letter-tile';
                     tile.innerText = letter;
-                    tile.dataset.letter = letter; // СОХРАНЯЕМ БУКВУ В АТРИБУТ
+                    tile.dataset.letter = letter;
                     tile.onclick = () => clickTile(tile, letter);
                     poolContainer.appendChild(tile);
                 });
@@ -707,6 +842,13 @@
                 tilesContainer.style.display = 'none';
                 ch1Actions.style.display = 'flex';
                 ch2Actions.style.display = 'none';
+                
+                // Восстанавливаем кнопку смены буквы
+                const changeBtn = document.getElementById('btn-change-letter');
+                changeBtn.innerHTML = 'Сменить букву <span>(15 🪙)</span>';
+                changeBtn.style.color = 'var(--gold)';
+                changeBtn.style.borderColor = 'var(--gold)';
+                changeBtn.style.background = 'rgba(212, 175, 55, 0.1)';
             }
 
             updateProgress();
@@ -731,7 +873,14 @@
             lastTile.classList.remove('used');
             currentWord = currentWord.slice(0, -1);
             
-            if (currentWord === "") hintUsedForCurrentWord = false;
+            // Если поле ввода полностью очищено - сбрасываем подсказку
+            if (currentWord === "") {
+                hintState = 0;
+                currentHintWord = "";
+                const hintBtn = document.getElementById('btn-hint');
+                hintBtn.className = 'action-btn hint-btn';
+                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+            }
 
             document.getElementById('current-word-display').innerText = currentWord;
             if (tg.HapticFeedback && tg.HapticFeedback.impactOccurred) tg.HapticFeedback.impactOccurred('light');
@@ -744,93 +893,130 @@
 
         // --- ПОДСКАЗКА (ГЛАВА 2) ---
         function getHint() {
-            if (bonusBalance < 20) return showPopup('Ошибка', 'Недостаточно бонусов! Подсказка стоит 20 🪙.');
-            if (hintUsedForCurrentWord) return showPopup('Ошибка', 'Вы уже использовали подсказку для этого слова!');
+            if (hintState === 2) {
+                return showPopup('Внимание', 'Вы уже полностью открыли это слово.');
+            }
 
-            const btn = document.querySelector('.hint-btn');
-            const originalText = btn.innerText;
-            btn.innerText = '⏳ Поиск...';
-            if (tg.HapticFeedback && tg.HapticFeedback.impactOccurred) tg.HapticFeedback.impactOccurred('light');
+            const btn = document.getElementById('btn-hint');
 
-            setTimeout(() => {
-                try {
-                    const level = allLevels[currentLevelIndex - 1];
-                    let candidates = [];
+            if (hintState === 0) {
+                // Первая подсказка (за монеты)
+                if (coinBalance < 20) return showPopup('Ошибка', 'Недостаточно монет! Подсказка стоит 20 🪙.');
+                
+                const originalText = btn.innerText;
+                btn.innerText = '⏳ Поиск...';
+                if (tg.HapticFeedback && tg.HapticFeedback.impactOccurred) tg.HapticFeedback.impactOccurred('light');
 
-                    // 1. Ищем строго подходящие под условие слова, которые можно составить
-                    for (const w of dictionary) {
-                        if (w.length < 4) continue; // Не берем слишком короткие
-                        if (enteredWords.includes(w)) continue;
-                        if (!canFormFromLetters(w, level.val)) continue;
+                setTimeout(() => {
+                    try {
+                        const level = allLevels[currentLevelIndex - 1];
+                        let candidates = [];
 
-                        if (level.condType === 'length' && w.length !== level.condVal) continue;
-                        if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
-                        if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
-                        if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
+                        for (const w of dictionary) {
+                            if (w.length < 4) continue;
+                            if (enteredWords.includes(w)) continue;
+                            if (!canFormFromLetters(w, level.val)) continue;
 
-                        candidates.push(w);
-                    }
+                            if (level.condType === 'length' && w.length !== level.condVal) continue;
+                            if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
+                            if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
+                            if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
 
-                    if (candidates.length === 0) {
-                        btn.innerText = originalText;
-                        return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих под условие слов нет.');
-                    }
-
-                    // 2. Сортируем по длине (от длинных к коротким)
-                    candidates.sort((a, b) => b.length - a.length);
-                    
-                    let bestWord = null;
-                    let bestHintPart = "";
-
-                    // 3. Ищем слово, которое даст НОВУЮ подсказку, а не ту, что уже есть в начале введенных слов
-                    for (const w of candidates) {
-                        const halfLength = Math.ceil(w.length / 2);
-                        const hintPart = w.slice(0, halfLength);
-                        
-                        // Проверяем: не начинается ли какое-либо введенное слово с этой же подсказки
-                        const isPrefixOfEntered = enteredWords.some(ew => ew.startsWith(hintPart));
-                        
-                        if (!isPrefixOfEntered) {
-                            bestWord = w;
-                            bestHintPart = hintPart;
-                            break;
+                            candidates.push(w);
                         }
-                    }
 
-                    if (!bestWord) {
-                        btn.innerText = originalText;
-                        return showPopup('Не найдено', 'Все оставшиеся слова начинаются с тех же букв, что вы уже вводили. Попробуйте угадать сами!');
-                    }
-
-                    // 4. Очищаем текущий ввод
-                    currentWord = "";
-                    selectedTileElements.forEach(el => el.classList.remove('used'));
-                    selectedTileElements = [];
-                    document.getElementById('current-word-display').innerText = '';
-
-                    // 5. Вставляем половину слова
-                    for (let char of bestHintPart) {
-                        const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => 
-                            el.dataset.letter === char && 
-                            !el.classList.contains('used')
-                        );
-                        
-                        if (tile) {
-                            clickTile(tile, char);
+                        if (candidates.length === 0) {
+                            btn.innerText = originalText;
+                            return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих под условие слов нет.');
                         }
-                    }
 
-                    btn.innerText = originalText;
-                    bonusBalance -= 20;
-                    updateBalanceUI();
-                    hintUsedForCurrentWord = true;
-                    if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
-                } catch (e) {
-                    console.error(e);
-                    btn.innerText = originalText;
-                    showPopup('Ошибка', 'Произошла ошибка при подсказке.');
-                }
-            }, 50);
+                        candidates.sort((a, b) => b.length - a.length);
+                        
+                        let bestWord = null;
+                        for (const w of candidates) {
+                            const halfLength = Math.ceil(w.length / 2);
+                            const hintPart = w.slice(0, halfLength);
+                            
+                            const isPrefixOfEntered = enteredWords.some(ew => ew.startsWith(hintPart));
+                            
+                            if (!isPrefixOfEntered) {
+                                bestWord = w;
+                                break;
+                            }
+                        }
+
+                        if (!bestWord) {
+                            btn.innerText = originalText;
+                            return showPopup('Не найдено', 'Все оставшиеся слова начинаются с тех же букв, что вы уже вводили. Попробуйте угадать сами!');
+                        }
+
+                        currentHintWord = bestWord;
+                        const halfLength = Math.ceil(bestWord.length / 2);
+                        const hintPart = bestWord.slice(0, halfLength);
+
+                        // Очищаем текущий ввод
+                        currentWord = "";
+                        selectedTileElements.forEach(el => el.classList.remove('used'));
+                        selectedTileElements = [];
+                        document.getElementById('current-word-display').innerText = '';
+
+                        for (let char of hintPart) {
+                            const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => 
+                                el.dataset.letter === char && !el.classList.contains('used')
+                            );
+                            if (tile) clickTile(tile, char);
+                        }
+
+                        // Меняем вид кнопки на Алмазную
+                        btn.className = 'action-btn hint-btn diamond-mode';
+                        btn.innerText = '💎 Доп. подсказка (1 💎)';
+                        
+                        coinBalance -= 20;
+                        updateCurrencyUI();
+                        hintState = 1;
+                        if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+                    } catch (e) {
+                        console.error(e);
+                        btn.innerText = originalText;
+                        showPopup('Ошибка', 'Произошла ошибка при подсказке.');
+                    }
+                }, 50);
+
+            } else if (hintState === 1) {
+                // Вторая подсказка (за алмазы)
+                tg.showPopup({
+                    title: 'Покупка подсказки',
+                    message: 'Вы точно хотите потратить 1 алмаз 💎, чтобы увидеть конец слова?',
+                    buttons: [
+                        { id: 'cancel', type: 'cancel', text: 'Отмена' },
+                        { id: 'buy', type: 'default', text: 'Купить 💎' }
+                    ]
+                }, (btnId) => {
+                    if (btnId === 'buy') {
+                        if (diamondBalance < 1) return showPopup('Ошибка', 'Недостаточно алмазов!');
+                        
+                        // Вводим вторую половину
+                        const halfLength = Math.ceil(currentHintWord.length / 2);
+                        const hintPart = currentHintWord.slice(halfLength);
+
+                        for (let char of hintPart) {
+                            const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => 
+                                el.dataset.letter === char && !el.classList.contains('used')
+                            );
+                            if (tile) clickTile(tile, char);
+                        }
+
+                        diamondBalance -= 1;
+                        updateCurrencyUI();
+                        
+                        btn.className = 'action-btn hint-btn';
+                        btn.innerText = '✅ Слово собрано';
+                        hintState = 2;
+                        
+                        if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+                    }
+                });
+            }
         }
 
         function updateProgress() {
@@ -840,39 +1026,62 @@
 
         // --- СПОСОБНОСТИ ГЛАВЫ 1 ---
         function changeLetter() {
-            if (bonusBalance < 10) return tg.showAlert('Недостаточно бонусов!');
-            const newLetter = prompt("Введите новую букву (например: А, Б, В...):");
-            if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
-            
-            const level = allLevels[currentLevelIndex - 1];
-            level.type = 'startsWith';
-            level.val = newLetter.toLowerCase();
-            level.text = `Начинается на "${newLetter.toUpperCase()}"`;
-            document.getElementById('current-task').innerText = level.text;
-            
-            bonusBalance -= 10;
-            updateBalanceUI();
-            if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert('Изменено!');
-        }
+            const btn = document.getElementById('btn-change-letter');
 
-        function changeCondition() {
-            if (bonusBalance < 15) return tg.showAlert('Недостаточно бонусов!');
-            const level = allLevels[currentLevelIndex - 1];
-            
-            const conditions = [
-                { type: 'endsWith', val: 'а', text: 'Заканчивается на "А"' },
-                { type: 'contains', val: 'ь', text: 'Содержит "Ь"' },
-                { type: 'length', val: 5, text: 'Ровно 5 букв' }
-            ];
-            const newCond = conditions[Math.floor(Math.random() * conditions.length)];
-            Object.assign(level, newCond);
-            
-            bonusBalance -= 15;
-            updateBalanceUI();
-            document.getElementById('current-task').innerText = level.text;
-            if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert('Условие изменено!');
+            if (letterChangeCount === 0) {
+                // Первый раз за монеты
+                if (coinBalance < 15) return tg.showAlert('Недостаточно монет! Смена буквы стоит 15 🪙.');
+                const newLetter = prompt("Введите новую букву (например: А, Б, В...):");
+                if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+                
+                const level = allLevels[currentLevelIndex - 1];
+                level.type = 'startsWith';
+                level.val = newLetter.toLowerCase();
+                level.text = `Начинается на "${newLetter.toUpperCase()}"`;
+                document.getElementById('current-task').innerText = level.text;
+                
+                coinBalance -= 15;
+                updateCurrencyUI();
+                letterChangeCount++;
+                
+                // Меняем вид кнопки на Алмазную
+                btn.innerHTML = 'Сменить букву <span>(1 💎)</span>';
+                btn.style.color = 'var(--diamond)';
+                btn.style.borderColor = 'var(--diamond)';
+                btn.style.background = 'rgba(0, 191, 255, 0.1)';
+                
+                if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+                tg.showAlert('Буква изменена!');
+            } else {
+                // Второй раз и далее за алмазы
+                tg.showPopup({
+                    title: 'Смена буквы',
+                    message: 'Вы уже меняли букву. Следующая смена будет стоить 1 алмаз 💎. Вы согласны?',
+                    buttons: [
+                        { id: 'cancel', type: 'cancel', text: 'Отмена' },
+                        { id: 'buy', type: 'default', text: 'Купить 💎' }
+                    ]
+                }, (btnId) => {
+                    if (btnId === 'buy') {
+                        if (diamondBalance < 1) return tg.showAlert('Недостаточно алмазов!');
+                        
+                        const newLetter = prompt("Введите новую букву (например: А, Б, В...):");
+                        if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+                        
+                        const level = allLevels[currentLevelIndex - 1];
+                        level.type = 'startsWith';
+                        level.val = newLetter.toLowerCase();
+                        level.text = `Начинается на "${newLetter.toUpperCase()}"`;
+                        document.getElementById('current-task').innerText = level.text;
+                        
+                        diamondBalance -= 1;
+                        updateCurrencyUI();
+                        
+                        if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+                        tg.showAlert('Буква изменена за алмаз!');
+                    }
+                });
+            }
         }
 
         // --- ВАЛИДАЦИЯ СЛОВ ---
@@ -946,7 +1155,14 @@
                 currentWord = "";
                 selectedTileElements.forEach(el => el.classList.remove('used'));
                 selectedTileElements = [];
-                hintUsedForCurrentWord = false;
+                
+                // Сброс подсказки после правильного ввода
+                hintState = 0;
+                currentHintWord = "";
+                const hintBtn = document.getElementById('btn-hint');
+                hintBtn.className = 'action-btn hint-btn';
+                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+                
                 document.getElementById('current-word-display').innerText = '';
             } else {
                 input.value = ''; 
@@ -961,18 +1177,22 @@
 
             // ПРОХОЖДЕНИЕ УРОВНЯ
             if (enteredWords.length >= level.target) {
-                if (currentLevelIndex === maxUnlockedLevel) {
-                    bonusBalance += 20; 
+                let isFirstTime = (currentLevelIndex === maxUnlockedLevel);
+                
+                // ЭКОНОМИКА: 25 монет только за первое прохождение
+                if (isFirstTime) {
+                    coinBalance += 25; 
                     maxUnlockedLevel++;
                     localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
-                    updateBalanceUI();
+                    updateCurrencyUI();
                     
                     if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
                     setTimeout(() => {
-                        tg.showAlert('Уровень пройден! +20 🪙');
+                        tg.showAlert('Уровень пройден! +25 🪙');
                         showLevelSelect();
                     }, 300);
                 } else {
+                    // За повторное прохождение монеты НЕ даются
                     if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
                     setTimeout(() => {
                         tg.showAlert('Уровень пройден!');
