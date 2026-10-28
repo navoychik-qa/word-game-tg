@@ -22,6 +22,7 @@
             --tile-bg: #e2b714;
             --tile-text: #17212b;
             --tile-used: #3b4a5a;
+            --star: #f39c12;
         }
 
         [data-theme="light"] {
@@ -39,6 +40,7 @@
             --tile-bg: #f0d470;
             --tile-text: #000000;
             --tile-used: #cccccc;
+            --star: #e67e22;
         }
 
         body {
@@ -57,12 +59,16 @@
         .menu-title { font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin: 0; cursor: pointer; user-select: none; }
         .theme-toggle { position: absolute; right: 0; background: none; border: none; font-size: 24px; cursor: pointer; padding: 5px; color: var(--text); z-index: 10; }
         
+        /* Блок валют в меню (кликабельный) */
         .balance {
             display: flex; justify-content: center; gap: 20px; font-size: 18px; font-weight: bold;
             margin-bottom: 20px; background: var(--secondary-bg); padding: 10px 20px; border-radius: 20px;
+            cursor: pointer; transition: background-color 0.2s; border: 1px solid transparent;
         }
+        .balance:active { background: rgba(128,128,128,0.2); border-color: var(--hint); }
         .balance span.gold { color: var(--gold); }
         .balance span.diamond { color: var(--diamond); }
+        .balance-hint { font-size: 10px; color: var(--hint); text-align: center; width: 100%; margin-top: -15px; margin-bottom: 20px; }
 
         .btn {
             background-color: var(--btn); color: var(--btn-text);
@@ -201,7 +207,7 @@
             background: var(--btn); color: white; border: none; padding: 10px 15px;
             border-radius: 8px; font-weight: bold; cursor: pointer;
         }
-        .shop-buy-btn.stars { background: #f39c12; }
+        .shop-buy-btn.stars { background: var(--star); }
         .shop-buy-btn.diamonds { background: var(--diamond); }
 
         /* МОДАЛЬНОЕ ОКНО ДЛЯ АДМИНКИ */
@@ -214,6 +220,7 @@
             background: var(--bg); padding: 25px; border-radius: 16px;
             width: 80%; max-width: 300px; text-align: center;
             border: 1px solid var(--hint); animation: slideIn 0.2s ease-out;
+            max-height: 80vh; overflow-y: auto;
         }
         .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--gold); }
         .modal-input {
@@ -226,6 +233,22 @@
         .modal-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
         .modal-btn.cancel { background: var(--secondary-bg); color: var(--text); }
         .modal-btn.confirm { background: var(--gold); color: #000; }
+
+        /* Окно покупки валюты */
+        .buy-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .buy-option {
+            background: var(--secondary-bg); border-radius: 8px; padding: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid var(--hint); cursor: pointer; transition: border-color 0.2s;
+        }
+        .buy-option:active { border-color: var(--gold); }
+        .buy-option-info { text-align: left; }
+        .buy-option-title { font-size: 16px; font-weight: bold; }
+        .buy-option-sub { font-size: 12px; color: var(--hint); }
+        .buy-option-price {
+            background: var(--star); color: #000; padding: 6px 12px;
+            border-radius: 6px; font-weight: bold; font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -235,7 +258,7 @@
         <div id="loading-text">Загрузка словаря...</div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО ПАРОЛЯ -->
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ АДМИНКИ -->
     <div class="modal-overlay" id="admin-modal">
         <div class="modal-content">
             <div class="modal-title">👑 Секретная панель</div>
@@ -247,6 +270,49 @@
         </div>
     </div>
 
+    <!-- МОДАЛЬНОЕ ОКНО ПОКУПКИ ВАЛЮТЫ -->
+    <div class="modal-overlay" id="currency-modal">
+        <div class="modal-content">
+            <div class="modal-title">💰 Пополнение баланса</div>
+            
+            <div class="buy-options">
+                <!-- Пакет 1 -->
+                <div class="buy-option" onclick="buyPackage('small', 10, 50, 0)">
+                    <div class="buy-option-info">
+                        <div class="buy-option-title">50 🪙</div>
+                        <div class="buy-option-sub">Небольшой старт</div>
+                    </div>
+                    <div class="buy-option-price">10 ⭐</div>
+                </div>
+
+                <!-- Пакет 2 -->
+                <div class="buy-option" onclick="buyPackage('medium', 25, 150, 10)">
+                    <div class="buy-option-info">
+                        <div class="buy-option-title">150 🪙 + 10 💎</div>
+                        <div class="buy-option-sub">Оптимальный выбор</div>
+                    </div>
+                    <div class="buy-option-price">25 ⭐</div>
+                </div>
+
+                <!-- Пакет 3 -->
+                <div class="buy-option" onclick="buyPackage('large', 50, 400, 50)">
+                    <div class="buy-option-info">
+                        <div class="buy-option-title">400 🪙 + 50 💎</div>
+                        <div class="buy-option-sub">Максимальная выгода 🔥</div>
+                    </div>
+                    <div class="buy-option-price">50 ⭐</div>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeCurrencyModal()">Закрыть</button>
+            </div>
+            <div style="text-align: center; color: var(--hint); font-size: 10px; margin-top: 10px;">
+                * Звезды Telegram обрабатываются через защищенный шлюз платежей.
+            </div>
+        </div>
+    </div>
+
     <!-- ЭКРАН 1: Главное меню -->
     <div id="screen-menu" class="screen active">
         <div class="menu-header">
@@ -254,14 +320,16 @@
             <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">☀️</button>
         </div>
         
-        <div class="balance">
+        <!-- Кликабельный блок валют -->
+        <div class="balance" onclick="openCurrencyModal()">
             <span class="gold">🪙 <span id="menu-coins">0</span></span>
             <span class="diamond">💎 <span id="menu-diamonds">0</span></span>
         </div>
+        <div class="balance-hint">Нажми, чтобы пополнить</div>
         
         <button id="btn-start" class="btn" onclick="showLevelSelect()" disabled>Загрузка...</button>
         <button class="btn btn-pvp" onclick="showPvpMockup()">⚔️ Один на один (PvP)</button>
-        <button class="btn btn-shop" onclick="showShop()">💎 Магазин</button>
+        <button class="btn btn-shop" onclick="showShop()">💎 Обмен валют</button>
         <button class="btn btn-secondary" onclick="tg.showAlert('Рейтинг и турниры в разработке!')">🏆 Рейтинг игроков</button>
         
         <button id="btn-reset" class="btn btn-reset" onclick="resetProgress()" style="display: none;">Сбросить прогресс</button>
@@ -302,7 +370,6 @@
             <div class="task-word" id="current-task">Загрузка...</div>
         </div>
 
-        <!-- Оставлена только кнопка смены буквы для 1 главы -->
         <div class="action-buttons" id="ch1-actions">
             <button class="action-btn" id="btn-change-letter" onclick="changeLetter()">Сменить букву <span>(15 🪙)</span></button>
         </div>
@@ -329,11 +396,11 @@
         <div class="progress" id="progress-text">Введено: 0 / 0</div>
     </div>
 
-    <!-- ЭКРАН 4: Магазин -->
+    <!-- ЭКРАН 4: Обмен валют -->
     <div id="screen-shop" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
-            <div class="level-info">Магазин</div>
+            <div class="level-info">Обмен валют</div>
             <div class="game-balance">
                 <span class="gold">🪙 <span id="shop-coins">0</span></span>
                 <span class="diamond">💎 <span id="shop-diamonds">0</span></span>
@@ -348,25 +415,9 @@
                 </div>
                 <button class="shop-buy-btn diamonds" onclick="buyCoinsWithDiamonds()">2 💎</button>
             </div>
-
-            <div class="shop-item">
-                <div class="shop-item-info">
-                    <div class="shop-item-title">50 Алмазов 💎</div>
-                    <div class="shop-item-price">Покупка за Звезды</div>
-                </div>
-                <button class="shop-buy-btn stars" onclick="buyDiamondsWithStars(50, 10)">10 ⭐</button>
-            </div>
-
-            <div class="shop-item">
-                <div class="shop-item-info">
-                    <div class="shop-item-title">150 Алмазов 💎</div>
-                    <div class="shop-item-price">Покупка за Звезды (выгодно)</div>
-                </div>
-                <button class="shop-buy-btn stars" onclick="buyDiamondsWithStars(150, 25)">25 ⭐</button>
-            </div>
             
             <div style="text-align: center; color: var(--hint); font-size: 12px; margin-top: 20px;">
-                * Звезды Telegram обрабатываются через защищенный шлюз платежей.
+                * Алмазы можно купить, нажав на баланс в главном меню.
             </div>
         </div>
     </div>
@@ -413,10 +464,10 @@
         let currentWord = "";
         let selectedTileElements = [];
         
-        // Переменные для способностей
-        let letterChangeCount = 0; // Сколько раз меняли букву на текущем уровне
-        let hintState = 0; // 0 - нет, 1 - куплена первая половина, 2 - слово собрано
-        let currentHintWord = ""; // Слово, которое было выбрано для подсказки
+        // Способности
+        let letterChangeCount = 0;
+        let hintState = 0;
+        let currentHintWord = "";
 
         const TOTAL_LEVELS = 100;
         let allLevels = []; 
@@ -430,27 +481,52 @@
             }
         }
 
+        // --- ПОКУПКА ВАЛЮТЫ ---
+        function openCurrencyModal() {
+            if (tg.HapticFeedback && tg.HapticFeedback.impactOccurred) tg.HapticFeedback.impactOccurred('light');
+            document.getElementById('currency-modal').classList.add('active');
+        }
+
+        function closeCurrencyModal() {
+            document.getElementById('currency-modal').classList.remove('active');
+        }
+
+        function buyPackage(id, stars, coins, diamonds) {
+            if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+            
+            // --- ТЕСТОВАЯ СИМУЛЯЦИЯ ПОКУПКИ ---
+            // В реальной игре здесь должен быть вызов tg.openInvoice(invoiceUrl, callback)
+            // где invoiceUrl генерируется вашим ботом на сервере.
+            
+            let msg = `Это тестовый режим.\nВ реальной игре вы бы заплатили ${stars} ⭐ и получили:\n`;
+            if (coins > 0) msg += `+${coins} 🪙 Монет\n`;
+            if (diamonds > 0) msg += `+${diamonds} 💎 Алмазов\n`;
+            msg += `\nВалюта уже начислена на ваш счет!`;
+            
+            showPopup('Покупка успешна', msg);
+            
+            coinBalance += coins;
+            diamondBalance += diamonds;
+            updateCurrencyUI();
+            closeCurrencyModal();
+        }
+
         // --- ОБНОВЛЕНИЕ ВАЛЮТ ---
         function updateCurrencyUI() {
-            // Меню
             document.getElementById('menu-coins').innerText = coinBalance;
             document.getElementById('menu-diamonds').innerText = diamondBalance;
-            // Выбор уровней
             document.getElementById('levels-coins').innerText = coinBalance;
             document.getElementById('levels-diamonds').innerText = diamondBalance;
-            // Игра
             document.getElementById('game-coins').innerText = coinBalance;
             document.getElementById('game-diamonds').innerText = diamondBalance;
-            // Магазин
             document.getElementById('shop-coins').innerText = coinBalance;
             document.getElementById('shop-diamonds').innerText = diamondBalance;
 
-            // Сохранение
             localStorage.setItem('wordBattleCoins', coinBalance);
             localStorage.setItem('wordBattleDiamonds', diamondBalance);
         }
 
-        // --- МАГАЗИН ---
+        // --- МАГАЗИН ОБМЕНА ---
         function showShop() {
             if (tg.HapticFeedback && tg.HapticFeedback.impactOccurred) tg.HapticFeedback.impactOccurred('light');
             updateCurrencyUI();
@@ -464,16 +540,6 @@
             updateCurrencyUI();
             if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
             showPopup('Успех', 'Вы обменяли 2 💎 на 100 🪙!');
-        }
-
-        function buyDiamondsWithStars(diamonds, stars) {
-            if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
-            showPopup(
-                'Покупка', 
-                `Это тестовый режим. В реальной игре вы бы заплатили ${stars} ⭐ и получили ${diamonds} 💎.\n\nАлмазы уже начислены на ваш счет!`
-            );
-            diamondBalance += diamonds;
-            updateCurrencyUI();
         }
 
         // --- СЕКРЕТНАЯ АДМИНКА ---
@@ -794,8 +860,6 @@
             enteredWords = [];
             currentWord = "";
             selectedTileElements = [];
-            
-            // Сброс способностей
             letterChangeCount = 0;
             hintState = 0;
             currentHintWord = "";
@@ -823,7 +887,6 @@
                 ch2Actions.style.display = 'flex';
                 poolContainer.innerHTML = '';
                 
-                // Восстанавливаем кнопку подсказки
                 const hintBtn = document.getElementById('btn-hint');
                 hintBtn.className = 'action-btn hint-btn';
                 hintBtn.innerText = '💡 Подсказка (20 🪙)';
@@ -843,7 +906,6 @@
                 ch1Actions.style.display = 'flex';
                 ch2Actions.style.display = 'none';
                 
-                // Восстанавливаем кнопку смены буквы
                 const changeBtn = document.getElementById('btn-change-letter');
                 changeBtn.innerHTML = 'Сменить букву <span>(15 🪙)</span>';
                 changeBtn.style.color = 'var(--gold)';
@@ -873,7 +935,6 @@
             lastTile.classList.remove('used');
             currentWord = currentWord.slice(0, -1);
             
-            // Если поле ввода полностью очищено - сбрасываем подсказку
             if (currentWord === "") {
                 hintState = 0;
                 currentHintWord = "";
@@ -900,7 +961,6 @@
             const btn = document.getElementById('btn-hint');
 
             if (hintState === 0) {
-                // Первая подсказка (за монеты)
                 if (coinBalance < 20) return showPopup('Ошибка', 'Недостаточно монет! Подсказка стоит 20 🪙.');
                 
                 const originalText = btn.innerText;
@@ -954,7 +1014,6 @@
                         const halfLength = Math.ceil(bestWord.length / 2);
                         const hintPart = bestWord.slice(0, halfLength);
 
-                        // Очищаем текущий ввод
                         currentWord = "";
                         selectedTileElements.forEach(el => el.classList.remove('used'));
                         selectedTileElements = [];
@@ -967,7 +1026,6 @@
                             if (tile) clickTile(tile, char);
                         }
 
-                        // Меняем вид кнопки на Алмазную
                         btn.className = 'action-btn hint-btn diamond-mode';
                         btn.innerText = '💎 Доп. подсказка (1 💎)';
                         
@@ -983,7 +1041,6 @@
                 }, 50);
 
             } else if (hintState === 1) {
-                // Вторая подсказка (за алмазы)
                 tg.showPopup({
                     title: 'Покупка подсказки',
                     message: 'Вы точно хотите потратить 1 алмаз 💎, чтобы увидеть конец слова?',
@@ -995,7 +1052,6 @@
                     if (btnId === 'buy') {
                         if (diamondBalance < 1) return showPopup('Ошибка', 'Недостаточно алмазов!');
                         
-                        // Вводим вторую половину
                         const halfLength = Math.ceil(currentHintWord.length / 2);
                         const hintPart = currentHintWord.slice(halfLength);
 
@@ -1029,7 +1085,6 @@
             const btn = document.getElementById('btn-change-letter');
 
             if (letterChangeCount === 0) {
-                // Первый раз за монеты
                 if (coinBalance < 15) return tg.showAlert('Недостаточно монет! Смена буквы стоит 15 🪙.');
                 const newLetter = prompt("Введите новую букву (например: А, Б, В...):");
                 if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
@@ -1044,7 +1099,6 @@
                 updateCurrencyUI();
                 letterChangeCount++;
                 
-                // Меняем вид кнопки на Алмазную
                 btn.innerHTML = 'Сменить букву <span>(1 💎)</span>';
                 btn.style.color = 'var(--diamond)';
                 btn.style.borderColor = 'var(--diamond)';
@@ -1053,7 +1107,6 @@
                 if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
                 tg.showAlert('Буква изменена!');
             } else {
-                // Второй раз и далее за алмазы
                 tg.showPopup({
                     title: 'Смена буквы',
                     message: 'Вы уже меняли букву. Следующая смена будет стоить 1 алмаз 💎. Вы согласны?',
@@ -1147,7 +1200,6 @@
                 return;
             }
 
-            // Успех
             if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
             enteredWords.push(word);
             
@@ -1156,7 +1208,6 @@
                 selectedTileElements.forEach(el => el.classList.remove('used'));
                 selectedTileElements = [];
                 
-                // Сброс подсказки после правильного ввода
                 hintState = 0;
                 currentHintWord = "";
                 const hintBtn = document.getElementById('btn-hint');
@@ -1175,11 +1226,9 @@
 
             updateProgress();
 
-            // ПРОХОЖДЕНИЕ УРОВНЯ
             if (enteredWords.length >= level.target) {
                 let isFirstTime = (currentLevelIndex === maxUnlockedLevel);
                 
-                // ЭКОНОМИКА: 25 монет только за первое прохождение
                 if (isFirstTime) {
                     coinBalance += 25; 
                     maxUnlockedLevel++;
@@ -1192,7 +1241,6 @@
                         showLevelSelect();
                     }, 300);
                 } else {
-                    // За повторное прохождение монеты НЕ даются
                     if (tg.HapticFeedback && tg.HapticFeedback.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
                     setTimeout(() => {
                         tg.showAlert('Уровень пройден!');
