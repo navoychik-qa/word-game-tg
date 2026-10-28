@@ -99,7 +99,7 @@
             text-align: center; margin-bottom: 10px; border: 1px solid rgba(128,128,128,0.2); flex-shrink: 0;
         }
         .task-title { font-size: 14px; color: var(--hint); margin-bottom: 5px; text-transform: uppercase; }
-        .task-word { font-size: 20px; font-weight: bold; color: var(--btn); }
+        .task-word { font-size: 18px; font-weight: bold; color: var(--btn); line-height: 1.2; }
 
         .action-buttons { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
         .action-btn {
@@ -222,7 +222,6 @@
     <!-- ЭКРАН 1: Главное меню -->
     <div id="screen-menu" class="screen active">
         <div class="menu-header">
-            <!-- Добавлен ID и обработчик клика для секретной админки -->
             <div class="menu-title" id="admin-trigger" onclick="handleAdminTap()">Word Battle</div>
             <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">☀️</button>
         </div>
@@ -270,13 +269,11 @@
             <button class="action-btn" onclick="changeCondition()">Сменить условие <span>(15 🪙)</span></button>
         </div>
 
-        <!-- Ввод с клавиатуры (Глава 1) -->
         <div class="input-group" id="keyboard-input-group">
             <input type="text" id="word-input" placeholder="Введи слово..." autocomplete="off">
             <button class="submit-btn" onclick="checkWord()">→</button>
         </div>
 
-        <!-- Конструктор из букв (Глава 2) -->
         <div class="tiles-container" id="tiles-container">
             <div class="current-word-display" id="current-word-display"></div>
             <div class="letters-pool" id="letters-pool"></div>
@@ -338,7 +335,6 @@
         function handleAdminTap() {
             adminTapCount++;
             clearTimeout(adminTapTimer);
-            // Сбрасываем счетчик, если пауза больше 1.5 секунд
             adminTapTimer = setTimeout(() => { adminTapCount = 0; }, 1500);
 
             if (adminTapCount >= 5) {
@@ -361,25 +357,22 @@
             const pass = document.getElementById('admin-password-input').value.trim();
             
             if (pass === 'Alabamagranda') {
-                // Пароль верный
                 closeAdminModal();
                 maxUnlockedLevel = 100;
                 localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
-                bonusBalance += 5000; // Бонусом накидываем монет
+                bonusBalance += 5000;
                 updateBalanceUI();
                 updateMenuUI();
                 
                 tg.HapticFeedback.notificationOccurred('success');
                 tg.showAlert('👑 Пароль верный! Админ-режим активирован.\nВсе 100 уровней открыты + 5000 монет.');
             } else {
-                // Пароль неверный
                 tg.HapticFeedback.notificationOccurred('error');
                 tg.showAlert('❌ Неверный пароль!');
                 document.getElementById('admin-password-input').value = '';
             }
         }
 
-        // Обработка нажатия Enter в поле пароля
         document.getElementById('admin-password-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') checkAdminPassword();
         });
@@ -411,6 +404,7 @@
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
             
+            // Глава 1: 1-50
             for (let i = 1; i <= 50; i++) {
                 let type, val, text, target;
                 if (i <= 10) {
@@ -432,23 +426,60 @@
                 allLevels.push({ type, val, text, target });
             }
 
+            // Глава 2: 51-100
             const vowels = 'аеиоуыэюя';
             const consonants = 'бвгджзклмнпрстфхцчшщ';
+            const condTypes = ['length', 'startsWith', 'endsWith', 'contains', 'any'];
             
             for (let i = 51; i <= 100; i++) {
                 const idx = i - 51;
-                const letterCount = 8 + Math.floor(idx / 10); 
+                const poolSize = 8 + Math.floor(idx / 10); 
                 const target = 3 + Math.floor(idx / 17);
                 
+                // Генерируем пул
                 let pool = [];
                 const seed = i * 13;
-                for (let j = 0; j < letterCount; j++) {
+                for (let j = 0; j < poolSize; j++) {
                     if ((seed + j) % 10 < 4) { pool.push(vowels[(seed + j) % vowels.length]); } 
                     else { pool.push(consonants[(seed * 2 + j) % consonants.length]); }
                 }
                 pool.sort(() => Math.random() - 0.5);
 
-                allLevels.push({ type: 'letters', val: pool, text: `Составь слова из ${letterCount} букв`, target: target });
+                // Выбираем тип условия
+                const condType = condTypes[idx % condTypes.length];
+                let conditionVal = null;
+                let text = "";
+
+                if (condType === 'any') {
+                    text = `Составь ${target} любых слова`;
+                } else if (condType === 'length') {
+                    conditionVal = 4 + (idx % 3); // 4, 5, 6 букв
+                    text = `Составь ${target} слова ровно из ${conditionVal} букв`;
+                } else if (condType === 'startsWith') {
+                    conditionVal = pool[Math.floor(Math.random() * pool.length)];
+                    text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`;
+                } else if (condType === 'endsWith') {
+                    // Ищем гласную в пуле для окончания
+                    const poolVowels = pool.filter(c => vowels.includes(c));
+                    if (poolVowels.length > 0) {
+                        conditionVal = poolVowels[Math.floor(Math.random() * poolVowels.length)];
+                    } else {
+                        conditionVal = pool[pool.length - 1];
+                    }
+                    text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`;
+                } else if (condType === 'contains') {
+                    conditionVal = pool[Math.floor(Math.random() * pool.length)];
+                    text = `Составь ${target} слова с буквой "${conditionVal.toUpperCase()}"`;
+                }
+
+                allLevels.push({ 
+                    type: 'letters', 
+                    val: pool, 
+                    condType: condType,
+                    condVal: conditionVal,
+                    text: text, 
+                    target: target 
+                });
             }
         }
         generateLevels();
@@ -635,12 +666,12 @@
             const tilesContainer = document.getElementById('tiles-container');
 
             if (level.type === 'letters') {
-                taskTitle.innerText = "Составь слово из букв:";
+                taskTitle.innerText = "Твоё задание:";
                 keyboardGroup.style.display = 'none';
                 tilesContainer.style.display = 'flex';
                 poolContainer.innerHTML = '';
                 
-                level.val.forEach((letter, index) => {
+                level.val.forEach((letter) => {
                     const tile = document.createElement('div');
                     tile.className = 'letter-tile';
                     tile.innerText = letter;
@@ -755,7 +786,31 @@
 
             const level = allLevels[currentLevelIndex - 1];
             
-            if (level.type !== 'letters') {
+            // ПРОВЕРКА УСЛОВИЙ
+            if (level.type === 'letters') {
+                // Проверка специфических условий для Главы 2
+                if (level.condType === 'length' && word.length !== level.condVal) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                    tg.showAlert(`Слово должно состоять ровно из ${level.condVal} букв!`);
+                    return;
+                }
+                if (level.condType === 'startsWith' && !word.startsWith(level.condVal)) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                    tg.showAlert(`Слово должно начинаться на "${level.condVal.toUpperCase()}"!`);
+                    return;
+                }
+                if (level.condType === 'endsWith' && !word.endsWith(level.condVal)) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                    tg.showAlert(`Слово должно заканчиваться на "${level.condVal.toUpperCase()}"!`);
+                    return;
+                }
+                if (level.condType === 'contains' && !word.includes(level.condVal)) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                    tg.showAlert(`Слово должно содержать букву "${level.condVal.toUpperCase()}"!`);
+                    return;
+                }
+            } else {
+                // Проверка для Главы 1
                 let isValid = false;
                 if (level.type === 'startsWith') isValid = word.startsWith(level.val);
                 else if (level.type === 'endsWith') isValid = word.endsWith(level.val);
