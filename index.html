@@ -66,7 +66,6 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
-        /* Экран загрузки */
         #loading-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg); display: flex; justify-content: center; align-items: center;
@@ -82,20 +81,17 @@
 </head>
 <body>
 
-    <!-- Экран загрузки словаря -->
     <div id="loading-screen">
         <div class="spinner"></div>
         <div id="loading-text">Загрузка словаря...</div>
     </div>
 
-    <!-- ЭКРАН 1: Меню -->
     <div id="screen-menu" class="screen active">
         <div class="menu-title">Word Battle</div>
         <button id="btn-start" class="btn" onclick="startGame()" disabled>Загрузка...</button>
         <button class="btn" onclick="tg.showAlert('Соревновательный режим в разработке!')">Один на один</button>
     </div>
 
-    <!-- ЭКРАН 2: Игра -->
     <div id="screen-game" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
@@ -122,7 +118,6 @@
         tg.ready();
         tg.expand();
 
-        // --- ПЕРЕМЕННЫЕ ---
         let dictionary = new Set();
         let currentLevelIndex = 0;
         let enteredWords = [];
@@ -135,21 +130,20 @@
             { type: 'startsWith', val: 'п', text: 'Начинается на "П"', target: 4 }
         ];
 
-        // --- РАСПАКОВКА GZIP ---
-        // Приоритет: нативный DecompressionStream → pako (fallback)
+        // Функция нормализации слова (приводит "ё" к "е" и убирает мусор)
+        function normalizeWord(word) {
+            return word.toLowerCase()
+                       .replace(/ё/g, 'е')
+                       .replace(/[^а-я]/g, ''); // Оставляем только буквы
+        }
+
         async function gunzipToString(arrayBuffer) {
-            // 1) Нативный способ (Chrome 80+, Safari 16.4+, все современные Telegram WebView)
             if (typeof DecompressionStream !== 'undefined') {
                 try {
-                    const stream = new Blob([arrayBuffer]).stream()
-                        .pipeThrough(new DecompressionStream('gzip'));
+                    const stream = new Blob([arrayBuffer]).stream().pipeThrough(new DecompressionStream('gzip'));
                     return await new Response(stream).text();
-                } catch (e) {
-                    console.warn('DecompressionStream не справился, пробуем pako...', e);
-                }
+                } catch (e) { console.warn('DecompressionStream fallback', e); }
             }
-
-            // 2) Fallback через pako
             if (typeof pako === 'undefined') {
                 await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js');
             }
@@ -166,7 +160,6 @@
             });
         }
 
-        // --- ЗАГРУЗКА СЛОВАРЯ ПРИ СТАРТЕ ---
         async function loadDictionary() {
             const loadingText = document.getElementById('loading-text');
             try {
@@ -174,16 +167,22 @@
                 if (!response.ok) throw new Error('Файл words.txt.gz не найден (HTTP ' + response.status + ')');
 
                 const buffer = await response.arrayBuffer();
-                const text = await gunzipToString(buffer);
+                let text = await gunzipToString(buffer);
 
+                // Убираем BOM-символ (невидимый символ в начале файла)
+                text = text.replace(/^\uFEFF/, '');
+
+                // Разбиваем на строки и нормализуем каждое слово
                 const wordsArray = text.split(/\r?\n/)
-                                      .map(w => w.trim().toLowerCase())
+                                      .map(w => normalizeWord(w))
                                       .filter(w => w.length > 0);
 
                 dictionary = new Set(wordsArray);
                 console.log(`Словарь загружен! Слов: ${dictionary.size}`);
+                
+                // Выведем первые 10 слов для проверки
+                console.log("Примеры слов из словаря:", Array.from(dictionary).slice(0, 10));
 
-                // Прячем экран загрузки и включаем кнопку
                 document.getElementById('loading-screen').style.display = 'none';
                 const startBtn = document.getElementById('btn-start');
                 startBtn.disabled = false;
@@ -197,10 +196,8 @@
             }
         }
 
-        // Запускаем загрузку сразу при открытии
         loadDictionary();
 
-        // --- ЛОГИКА ИГРЫ ---
         function switchScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
@@ -237,18 +234,18 @@
 
         function updateProgress() {
             const level = levels[currentLevelIndex];
-            document.getElementById('progress-text').innerText =
-                `Введено: ${enteredWords.length} / ${level.target}`;
+            document.getElementById('progress-text').innerText = `Введено: ${enteredWords.length} / ${level.target}`;
         }
 
         function checkWord() {
             const input = document.getElementById('word-input');
-            const word = input.value.trim().toLowerCase();
+            const rawWord = input.value.trim();
+            const word = normalizeWord(rawWord);
 
             if (!word) return;
 
-            // 1. Только русские буквы
-            if (!/^[а-яё]+$/.test(word)) {
+            // 1. Проверка на русские буквы
+            if (!/^[а-я]+$/.test(word)) {
                 tg.HapticFeedback.notificationOccurred('error');
                 tg.showAlert('Только русские буквы!');
                 return;
@@ -257,6 +254,11 @@
             // 2. Проверка по словарю
             if (!dictionary.has(word)) {
                 tg.HapticFeedback.notificationOccurred('error');
+                
+                // ОТЛАДКА: Выводим в консоль информацию
+                console.warn(`Слово "${word}" не найдено.`);
+                console.log("Примеры слов из словаря:", Array.from(dictionary).slice(0, 5));
+                
                 tg.showAlert('Такого слова нет в словаре!');
                 return;
             }
@@ -264,7 +266,6 @@
             const level = levels[currentLevelIndex];
             let isValid = false;
 
-            // 3. Проверка условий уровня
             if (level.type === 'startsWith') isValid = word.startsWith(level.val);
             else if (level.type === 'endsWith') isValid = word.endsWith(level.val);
             else if (level.type === 'contains') isValid = word.includes('ь') || word.includes('ъ');
@@ -276,21 +277,19 @@
                 return;
             }
 
-            // 4. Проверка на повтор
             if (enteredWords.includes(word)) {
                 tg.HapticFeedback.notificationOccurred('warning');
                 tg.showAlert('Ты уже вводил это слово!');
                 return;
             }
 
-            // Успех!
             tg.HapticFeedback.notificationOccurred('success');
             enteredWords.push(word);
-            input.value = '';
+            input.value = ''; 
 
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
-            wordItem.innerHTML = `<span>${word}</span> <span>+1</span>`;
+            wordItem.innerHTML = `<span>${rawWord}</span> <span>+1</span>`; // Показываем как ввел юзер
             document.getElementById('words-container').prepend(wordItem);
 
             updateProgress();
