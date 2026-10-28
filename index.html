@@ -121,6 +121,9 @@
         let dictionary = new Set();
         let currentLevelIndex = 0;
         let enteredWords = [];
+        
+        // Для отладки запомним первые 10 слов
+        let sampleWords = [];
 
         const levels = [
             { type: 'startsWith', val: 'к', text: 'Начинается на "К"', target: 3 },
@@ -130,11 +133,11 @@
             { type: 'startsWith', val: 'п', text: 'Начинается на "П"', target: 4 }
         ];
 
-        // Функция нормализации слова (приводит "ё" к "е" и убирает мусор)
+        // Очистка слова от лишних символов и замена ё на е
         function normalizeWord(word) {
             return word.toLowerCase()
                        .replace(/ё/g, 'е')
-                       .replace(/[^а-я]/g, ''); // Оставляем только буквы
+                       .replace(/[^а-я]/g, ''); 
         }
 
         async function gunzipToString(arrayBuffer) {
@@ -163,25 +166,28 @@
         async function loadDictionary() {
             const loadingText = document.getElementById('loading-text');
             try {
-                const response = await fetch('words.txt.gz');
+                // ДОБАВЛЕН ?v=time ЧТОБЫ ОБОЙТИ КЭШ
+                const response = await fetch('words.txt.gz?v=' + Date.now());
                 if (!response.ok) throw new Error('Файл words.txt.gz не найден (HTTP ' + response.status + ')');
 
                 const buffer = await response.arrayBuffer();
                 let text = await gunzipToString(buffer);
 
-                // Убираем BOM-символ (невидимый символ в начале файла)
+                // Убираем BOM-символ
                 text = text.replace(/^\uFEFF/, '');
 
-                // Разбиваем на строки и нормализуем каждое слово
+                // Разбиваем на строки и нормализуем
                 const wordsArray = text.split(/\r?\n/)
                                       .map(w => normalizeWord(w))
                                       .filter(w => w.length > 0);
 
                 dictionary = new Set(wordsArray);
-                console.log(`Словарь загружен! Слов: ${dictionary.size}`);
                 
-                // Выведем первые 10 слов для проверки
-                console.log("Примеры слов из словаря:", Array.from(dictionary).slice(0, 10));
+                // Сохраняем первые 10 слов для отладки
+                sampleWords = Array.from(dictionary).slice(0, 10);
+                
+                console.log(`Словарь загружен! Слов: ${dictionary.size}`);
+                console.log("Примеры слов:", sampleWords);
 
                 document.getElementById('loading-screen').style.display = 'none';
                 const startBtn = document.getElementById('btn-start');
@@ -192,7 +198,7 @@
                 console.error(error);
                 loadingText.style.color = 'red';
                 loadingText.innerText = 'Ошибка загрузки словаря';
-                tg.showAlert('Ошибка загрузки словаря: ' + error.message);
+                tg.showAlert('Ошибка загрузки: ' + error.message);
             }
         }
 
@@ -244,22 +250,22 @@
 
             if (!word) return;
 
-            // 1. Проверка на русские буквы
             if (!/^[а-я]+$/.test(word)) {
                 tg.HapticFeedback.notificationOccurred('error');
                 tg.showAlert('Только русские буквы!');
                 return;
             }
 
-            // 2. Проверка по словарю
             if (!dictionary.has(word)) {
                 tg.HapticFeedback.notificationOccurred('error');
                 
-                // ОТЛАДКА: Выводим в консоль информацию
-                console.warn(`Слово "${word}" не найдено.`);
-                console.log("Примеры слов из словаря:", Array.from(dictionary).slice(0, 5));
+                // ОТЛАДКА: Показываем пользователю, что в словаре
+                let debugMsg = `Слова "${word}" нет в словаре.\n\n`;
+                debugMsg += `Всего слов: ${dictionary.size}\n\n`;
+                debugMsg += `Первые слова из файла:\n${sampleWords.join(', ')}`;
                 
-                tg.showAlert('Такого слова нет в словаре!');
+                // Показываем всплывающее окно с инфой
+                tg.showAlert(debugMsg);
                 return;
             }
 
@@ -289,7 +295,7 @@
 
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
-            wordItem.innerHTML = `<span>${rawWord}</span> <span>+1</span>`; // Показываем как ввел юзер
+            wordItem.innerHTML = `<span>${rawWord}</span> <span>+1</span>`;
             document.getElementById('words-container').prepend(wordItem);
 
             updateProgress();
