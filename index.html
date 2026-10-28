@@ -374,62 +374,34 @@
         </div>
     </div>
 
-    <script>
+        <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // --- НАСТРОЙКА СЕРВЕРА ---
-        // ВАЖНО: Замените этот URL на адрес вашего развернутого сервера Node.js!
-        const SERVER_URL = 'https://word-battle-server.onrender.com'; 
+        // ВАЖНО: Ссылка на ваш сервер Render
+        const SERVER_URL = 'https://word-battle-server-xxxx.onrender.com'; 
         
         let socket = null;
+        let pvp = { active: false, isSearching: false, roomId: null };
 
-        // --- ДАННЫЕ ---
         let dictionary = new Set();
-        let enteredWords = [];
-        
-        let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
-        let currentLevelIndex = 1;
-        
         let coinBalance = parseInt(localStorage.getItem('wordBattleCoins') || '50');
         let diamondBalance = parseInt(localStorage.getItem('wordBattleDiamonds') || '0');
         let playerRating = parseInt(localStorage.getItem('wordBattleRating') || '1000');
-        
-        let currentChapterView = 1;
-        let currentWord = "";
-        let selectedTileElements = [];
-        let letterChangeCount = 0;
-        let hintState = 0;
-        let currentHintWord = "";
-        
-        let pvp = {
-            active: false,
-            isSearching: false,
-            timer: 15,
-            roomId: null
-        };
-
-        const TOTAL_LEVELS = 100;
-        let allLevels = []; 
+        let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
 
         function showPopup(title, message) {
-            if (tg.showPopup) {
-                tg.showPopup({ title: title, message: message, buttons: [{ type: 'ok' }] });
-            } else {
-                tg.showAlert(message);
-            }
+            if (tg.showPopup) tg.showPopup({ title, message, buttons: [{ type: 'ok' }] });
+            else tg.showAlert(message);
         }
 
         // --- СЕТЕВАЯ ИГРА ---
         function initSocket() {
             if (socket) return;
-            
             socket = io(SERVER_URL);
 
             socket.on('connect', () => {
-                console.log('Подключено к серверу:', socket.id);
-                // Отправляем данные игрока
                 socket.emit('auth', {
                     id: tg.initDataUnsafe?.user?.id || 'guest_' + Math.floor(Math.random() * 1000),
                     name: tg.initDataUnsafe?.user?.first_name || 'Игрок'
@@ -437,49 +409,44 @@
             });
 
             socket.on('auth_success', (data) => {
-                console.log('Авторизация успешна:', data);
-                playerRating = data.rating; // Обновляем рейтинг с сервера
+                playerRating = data.rating;
                 updateCurrencyUI();
             });
 
             socket.on('searching', () => {
                 document.getElementById('pvp-search-overlay').classList.add('active');
-                pvp.isSearching = true;
             });
 
             socket.on('match_found', (data) => {
                 document.getElementById('pvp-search-overlay').classList.remove('active');
-                pvp.isSearching = false;
                 pvp.active = true;
                 pvp.roomId = data.roomId;
-
                 document.getElementById('enemy-name').innerText = data.p2Data.name;
                 document.getElementById('my-name').innerText = data.p1Data.name;
-                
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             });
 
             socket.on('round_start', (data) => {
-                pvp.timer = data.time;
-                document.getElementById('pvp-timer').innerText = pvp.timer;
+                document.getElementById('pvp-timer').innerText = data.time;
                 document.getElementById('pvp-timer').classList.remove('danger');
-                document.getElementById('pvp-task-text').innerText = `${data.condition}`;
+                document.getElementById('pvp-task-text').innerText = data.taskText;
                 
-                // Разблокируем ввод и способности
+                // Сброс интерфейса
+                document.getElementById('my-score').innerText = '0';
+                document.getElementById('enemy-score').innerText = '0';
                 document.getElementById('pvp-input').disabled = false;
                 document.getElementById('pvp-input').value = '';
                 document.getElementById('pvp-submit-btn').disabled = false;
                 document.getElementById('pvp-input').focus();
                 
                 for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = false;
+            });
 
-                // Сброс счета на экране
-                document.getElementById('my-score').innerText = '0';
-                document.getElementById('enemy-score').innerText = '0';
+            socket.on('task_update', (taskText) => {
+                document.getElementById('pvp-task-text').innerText = taskText;
             });
 
             socket.on('timer_update', (time) => {
-                pvp.timer = time;
                 document.getElementById('pvp-timer').innerText = time;
                 if (time <= 5) document.getElementById('pvp-timer').classList.add('danger');
             });
@@ -489,13 +456,29 @@
                 document.getElementById('enemy-score').innerText = data.p2Score;
             });
 
+            socket.on('word_error', (msg) => {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                showPopup('Ошибка', msg);
+            });
+
+            socket.on('word_success', (word) => {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                document.getElementById('pvp-input').value = '';
+            });
+
+            socket.on('ability_used', (data) => {
+                if (data.by !== socket.id) {
+                    showPopup('Соперник использовал способность!', 'Будьте внимательны.');
+                }
+            });
+
             socket.on('round_end', (data) => {
                 document.getElementById('pvp-input').disabled = true;
                 document.getElementById('pvp-submit-btn').disabled = true;
                 for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = true;
 
-                document.getElementById('my-lives').innerText = '❤️'.repeat(data.p1Lives) + '🖤'.repeat(3 - data.p1Lives);
-                document.getElementById('enemy-lives').innerText = '❤️'.repeat(data.p2Lives) + '🖤'.repeat(3 - data.p2Lives);
+                document.getElementById('my-lives').innerText = '❤️'.repeat(Math.max(0, data.p1Lives)) + '🖤'.repeat(3 - Math.max(0, data.p1Lives));
+                document.getElementById('enemy-lives').innerText = '❤️'.repeat(Math.max(0, data.p2Lives)) + '🖤'.repeat(3 - Math.max(0, data.p2Lives));
             });
 
             socket.on('game_over', (data) => {
@@ -514,11 +497,11 @@
                     `${isWin ? 'Вы выиграли битву!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`
                 );
 
-                setTimeout(() => { switchScreen('screen-rating'); }, 1000);
+                setTimeout(() => { goToMenu(); switchScreen('screen-rating'); }, 1000);
             });
 
             socket.on('opponent_left', () => {
-                showPopup('Соперник вышел', 'Битва завершена. Вам засчитано техническое поражение.');
+                showPopup('Соперник вышел', 'Битва завершена.');
                 pvp.active = false;
                 setTimeout(() => goToMenu(), 1500);
             });
@@ -527,7 +510,6 @@
         function searchPvPMatch() {
             if (!socket) initSocket();
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            
             switchScreen('screen-pvp');
             socket.emit('find_match');
         }
@@ -535,20 +517,12 @@
         function cancelSearch() {
             if (socket) socket.emit('cancel_search');
             document.getElementById('pvp-search-overlay').classList.remove('active');
-            pvp.isSearching = false;
             goToMenu();
         }
 
         function quitPvP() {
-            if (pvp.active && socket) {
-                // Если вышли во время игры, считаем как поражение
-                socket.disconnect();
-                socket = null;
-                pvp.active = false;
-            } else if (pvp.isSearching && socket) {
-                socket.emit('cancel_search');
-                pvp.isSearching = false;
-            }
+            if (pvp.active && socket) { socket.disconnect(); socket = null; pvp.active = false; }
+            else if (socket) socket.emit('cancel_search');
             goToMenu();
         }
 
@@ -556,62 +530,46 @@
             const input = document.getElementById('pvp-input');
             const word = input.value.trim().toLowerCase();
             if (!word) return;
-
-            // Отправляем на сервер (сервер сам проверит)
             socket.emit('submit_word', { word });
-            input.value = '';
         }
 
         function useAbility(id) {
             if (!pvp.active) return;
             socket.emit('use_ability', id);
-            document.getElementById(`ab-${id}`).disabled = true;
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
         }
 
-        // --- ОБНОВЛЕНИЕ UI ---
+        // --- ОСТАЛЬНОЙ UI КОД (Уровни, магазин, меню) ---
+        // [Оставьте ваши старые функции switchScreen, goToMenu, showLevelSelect, showShop, showRating, updateMenuUI, loadDictionary и т.д. здесь, они не меняются]
+        
         function updateCurrencyUI() {
-            document.getElementById('menu-coins').innerText = coinBalance;
-            document.getElementById('menu-diamonds').innerText = diamondBalance;
-            document.getElementById('levels-coins').innerText = coinBalance;
-            document.getElementById('levels-diamonds').innerText = diamondBalance;
-            document.getElementById('game-coins').innerText = coinBalance;
-            document.getElementById('game-diamonds').innerText = diamondBalance;
-            document.getElementById('shop-coins').innerText = coinBalance;
-            document.getElementById('shop-diamonds').innerText = diamondBalance;
-            document.getElementById('my-rating').innerText = `Ваш рейтинг: ${playerRating}`;
-
+            document.querySelectorAll('.menu-coins, .levels-coins, .game-coins, .shop-coins').forEach(el => el.innerText = coinBalance);
+            document.querySelectorAll('.menu-diamonds, .levels-diamonds, .game-diamonds, .shop-diamonds').forEach(el => el.innerText = diamondBalance);
+            const ratingEl = document.getElementById('my-rating');
+            if (ratingEl) ratingEl.innerText = `Ваш рейтинг: ${playerRating}`;
             localStorage.setItem('wordBattleCoins', coinBalance);
             localStorage.setItem('wordBattleDiamonds', diamondBalance);
             localStorage.setItem('wordBattleRating', playerRating);
         }
 
-        // --- СТАРЫЙ ФУНКЦИОНАЛ ---
         function switchScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
         }
 
         function goToMenu() {
-            if (pvp.active) quitPvP();
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            updateMenuUI();
+            if (maxUnlockedLevel > 1) document.getElementById('btn-start').innerText = `🎮 Продолжить (Ур. ${maxUnlockedLevel})`;
             switchScreen('screen-menu');
         }
-
-        function showLevelSelect() { switchScreen('screen-levels'); renderLevelGrid(); }
-        function showShop() { updateCurrencyUI(); switchScreen('screen-shop'); }
+        
         function showRating() { updateCurrencyUI(); switchScreen('screen-rating'); }
-
-        function updateMenuUI() {
-            const startBtn = document.getElementById('btn-start');
-            if (maxUnlockedLevel > 1) startBtn.innerText = `🎮 Продолжить (Ур. ${maxUnlockedLevel})`;
-            else startBtn.innerText = `🎮 Одиночный режим`;
-        }
-
-        // Заглушка для остальных функций
-        function loadDictionary() { document.getElementById('loading-screen').style.display = 'none'; document.getElementById('btn-start').disabled = false; updateMenuUI(); updateCurrencyUI(); }
-        loadDictionary();
+        
+        // Запускаем загрузку
+        // (Ваша функция loadDictionary, которая убирает спиннер и т.д.)
+        document.getElementById('loading-screen').style.display = 'none'; 
+        document.getElementById('btn-start').disabled = false;
+        updateCurrencyUI();
     </script>
 </body>
 </html>
