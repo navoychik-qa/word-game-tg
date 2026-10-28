@@ -29,7 +29,7 @@
             --secondary-bg: #f1f1f1;
             --danger: #d32f2f;
             --success: #388e3c;
-            --gold: #d4af37; /* Темнее золото для светлого фона */
+            --gold: #d4af37;
             --locked-bg: #e0e0e0;
         }
 
@@ -46,11 +46,13 @@
         .screen.active { display: flex; }
 
         /* Меню */
-        .menu-header { position: relative; display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 10px; }
+        .menu-header { position: relative; display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 10px; width: 100%; }
         .menu-title { font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin: 0; }
+        
+        /* ИСПРАВЛЕНО: Кнопка темы теперь видна и кликабельна */
         .theme-toggle { 
             position: absolute; right: 0; background: none; border: none; font-size: 24px; 
-            cursor: pointer; padding: 5px; transition: transform 0.2s;
+            cursor: pointer; padding: 5px; transition: transform 0.2s; color: var(--text); z-index: 10;
         }
         .theme-toggle:active { transform: scale(0.8); }
         
@@ -190,7 +192,7 @@
     <!-- ЭКРАН 3: Игра -->
     <div id="screen-game" class="screen">
         <div class="header">
-            <!-- ИЗМЕНЕНО: Вызов окна подтверждения -->
+            <!-- Выход с подтверждением -->
             <button class="back-btn" onclick="confirmLeaveLevel()">←</button>
             <div class="level-info" id="level-display">Уровень 1</div>
             <div class="bonus-badge">🪙 <span id="game-balance">0</span></div>
@@ -282,10 +284,9 @@
             document.getElementById('theme-toggle').innerText = theme === 'dark' ? '☀️' : '🌙';
         }
 
-        // Вызываем инициализацию темы сразу
         initTheme();
 
-        // Создаем уровни при запуске
+        // Создаем уровни
         function generateLevels() {
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
@@ -428,8 +429,15 @@
         }
 
         function resetProgress() {
-            tg.showConfirm('Сбросить весь прогресс и бонусы?', (ok) => {
-                if (ok) {
+            tg.showPopup({
+                title: 'Сброс',
+                message: 'Вы уверены, что хотите сбросить весь прогресс и бонусы?',
+                buttons: [
+                    { id: 'cancel', type: 'cancel', text: 'Отмена' },
+                    { id: 'reset', type: 'destructive', text: 'Сбросить' }
+                ]
+            }, (buttonId) => {
+                if (buttonId === 'reset') {
                     maxUnlockedLevel = 1;
                     bonusBalance = 50;
                     localStorage.setItem('wordBattleMaxUnlocked', 1);
@@ -478,15 +486,22 @@
             loadLevel();
         }
 
-        // НОВАЯ ФУНКЦИЯ: Подтверждение выхода
+        // ИСПРАВЛЕНО: Замена showConfirm на надежный showPopup
         function confirmLeaveLevel() {
-            // Если ни одного слова не введено, выходим без вопросов
             if (enteredWords.length === 0) {
                 showLevelSelect();
                 return;
             }
-            tg.showConfirm('Вы точно хотите покинуть уровень? Весь прогресс будет утерян.', (ok) => {
-                if (ok) {
+            
+            tg.showPopup({
+                title: 'Выход',
+                message: 'Вы точно хотите покинуть уровень? Весь прогресс будет утерян.',
+                buttons: [
+                    { id: 'cancel', type: 'cancel', text: 'Остаться' },
+                    { id: 'leave', type: 'destructive', text: 'Выйти' }
+                ]
+            }, (buttonId) => {
+                if (buttonId === 'leave') {
                     showLevelSelect();
                 }
             });
