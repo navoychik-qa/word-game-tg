@@ -226,18 +226,15 @@
         let dictionary = new Set();
         let enteredWords = [];
         
-        // Прогресс: maximumUnlockedLevel — сколько уровней открыто
         let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
-        let currentLevelIndex = 1; // Текущий выбранный уровень
+        let currentLevelIndex = 1;
         let bonusBalance = parseInt(localStorage.getItem('wordBattleBonus') || '50');
 
-        // Генератор 50 уровней
         const TOTAL_LEVELS = 50;
         const allLevels = [];
 
         // Создаем уровни при запуске
         function generateLevels() {
-            // Базовые условия для первых 50 уровней
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
             
@@ -245,7 +242,6 @@
                 let type, val, text, target;
 
                 if (i <= 10) {
-                    // 1-10: Простые
                     const idx = i - 1;
                     if (i <= 4) {
                         type = 'startsWith'; val = lettersStart[idx]; 
@@ -258,7 +254,6 @@
                         text = `Ровно ${val} букв`; target = 3;
                     }
                 } else if (i <= 30) {
-                    // 11-30: Средние
                     const idx = i - 11;
                     if (i <= 18) {
                         type = 'startsWith'; val = lettersStart[idx % lettersStart.length]; 
@@ -271,7 +266,6 @@
                         text = `Ровно ${val} букв`; target = 4;
                     }
                 } else {
-                    // 31-50: Сложные
                     const idx = i - 31;
                     if (i <= 38) {
                         type = 'contains'; val = lettersEnd[idx % lettersEnd.length]; 
@@ -299,14 +293,19 @@
             localStorage.setItem('wordBattleBonus', bonusBalance);
         }
 
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОБНОВЛЕНИЯ МЕНЮ
         function updateMenuUI() {
             const startBtn = document.getElementById('btn-start');
             const resetBtn = document.getElementById('btn-reset');
             
-            if (startBtn.innerText !== 'Загрузка...') {
-                startBtn.innerText = `🎮 Одиночный режим (${maxUnlockedLevel - 1}/${TOTAL_LEVELS})`;
-                resetBtn.style.display = maxUnlockedLevel > 1 ? 'block' : 'none';
+            // Всегда принудительно меняем текст
+            if (maxUnlockedLevel > 1) {
+                startBtn.innerText = `🎮 Продолжить (Ур. ${maxUnlockedLevel})`;
+            } else {
+                startBtn.innerText = `🎮 Одиночный режим`;
             }
+            
+            resetBtn.style.display = maxUnlockedLevel > 1 ? 'block' : 'none';
         }
 
         // --- ЗАГРУЗКА СЛОВАРЯ ---
@@ -344,7 +343,7 @@
                 document.getElementById('btn-start').disabled = false;
                 
                 updateBalanceUI();
-                updateMenuUI();
+                updateMenuUI(); // Теперь тут текст поменяется
             } catch (error) {
                 console.error(error);
                 loadingText.style.color = 'red';
@@ -405,7 +404,7 @@
                 if (i < maxUnlockedLevel) {
                     btn.classList.add('completed');
                 } else if (i === maxUnlockedLevel) {
-                    btn.classList.add('current'); // Текущий доступный
+                    btn.classList.add('current'); 
                 } else {
                     btn.classList.add('locked');
                     btn.innerHTML = '🔒';
@@ -537,7 +536,6 @@
 
             // ПРОХОЖДЕНИЕ УРОВНЯ
             if (enteredWords.length >= level.target) {
-                // Награда дается только за первое прохождение
                 if (currentLevelIndex === maxUnlockedLevel) {
                     bonusBalance += 20; 
                     maxUnlockedLevel++;
@@ -550,7 +548,6 @@
                         showLevelSelect();
                     }, 300);
                 } else {
-                    // Если переигрываем старый уровень
                     tg.HapticFeedback.notificationOccurred('success');
                     setTimeout(() => {
                         tg.showAlert('Уровень пройден!');
