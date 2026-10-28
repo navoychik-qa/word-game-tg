@@ -247,4 +247,371 @@
         </div>
 
         <div class="task-card">
-            <div class="task-title" id="task-title-text">Тво
+            <div class="task-title" id="task-title-text">Твоё задание:</div>
+            <div class="task-word" id="current-task">Загрузка...</div>
+        </div>
+
+        <div class="action-buttons" id="ch1-actions">
+            <button class="action-btn" id="btn-change-letter" onclick="changeLetter()">Сменить букву <span>(15 🪙)</span></button>
+        </div>
+
+        <div class="action-buttons" id="ch2-actions" style="display: none;">
+            <button class="action-btn hint-btn" id="btn-hint" onclick="getHint()">💡 Подсказка (20 🪙)</button>
+        </div>
+
+        <div class="input-group" id="keyboard-input-group">
+            <input type="text" id="word-input" placeholder="Введи слово..." autocomplete="off">
+            <button class="submit-btn" onclick="checkWord()">→</button>
+        </div>
+
+        <div class="tiles-container" id="tiles-container">
+            <div class="current-word-display" id="current-word-display"></div>
+            <div class="letters-pool" id="letters-pool"></div>
+            <div class="tile-controls">
+                <button class="tile-btn backspace" onclick="backspaceTile()">⌫</button>
+                <button class="tile-btn submit" onclick="submitTileWord()">Проверить</button>
+            </div>
+        </div>
+
+        <div class="words-list" id="words-container"></div>
+        <div class="progress" id="progress-text">Введено: 0 / 0</div>
+    </div>
+
+    <!-- ЭКРАН 4: Обмен валют -->
+    <div id="screen-shop" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="goToMenu()">←</button>
+            <div class="level-info">Обмен валют</div>
+            <div class="game-balance">
+                <span class="gold">🪙 <span id="shop-coins">0</span></span>
+                <span class="diamond">💎 <span id="shop-diamonds">0</span></span>
+            </div>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto;">
+            <div class="shop-item">
+                <div class="shop-item-info">
+                    <div class="shop-item-title">100 Монет 🪙</div>
+                    <div class="shop-item-price">Обменять на алмазы</div>
+                </div>
+                <button class="shop-buy-btn diamonds" onclick="buyCoinsWithDiamonds()">2 💎</button>
+            </div>
+            <div style="text-align: center; color: var(--hint); font-size: 12px; margin-top: 20px;">
+                * Алмазы можно купить, нажав на баланс в главном меню.
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 5: PvP (Онлайн) -->
+    <div id="screen-pvp" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="quitPvP()" style="color: white;">←</button>
+            <div class="level-info" style="color: white;">Битва 1 на 1</div>
+            <div style="width: 24px;"></div>
+        </div>
+
+        <div class="pvp-screen" style="position: relative;">
+            
+            <!-- Оверлей поиска игры -->
+            <div id="pvp-search-overlay">
+                <div class="search-spinner"></div>
+                <div style="font-size: 18px; font-weight: bold;">Поиск соперника...</div>
+                <button class="btn" style="width: 60%; margin-top: 20px; background: rgba(255,255,255,0.2);" onclick="cancelSearch()">Отмена</button>
+            </div>
+
+            <!-- Враг -->
+            <div class="pvp-player enemy">
+                <div class="pvp-name" id="enemy-name">Ожидание...</div>
+                <div class="pvp-lives" id="enemy-lives">❤️❤️❤️</div>
+                <div class="pvp-score" id="enemy-score">0</div>
+                <div class="pvp-avatar">👤</div>
+            </div>
+
+            <!-- Таймер и Поле боя -->
+            <div class="pvp-timer" id="pvp-timer">15</div>
+
+            <div class="pvp-mid">
+                <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 14px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 8px;" id="pvp-task-text">
+                    Ожидание соперника...
+                </div>
+                
+                <div class="pvp-word-input">
+                    <input type="text" id="pvp-input" placeholder="Введи слово..." autocomplete="off" disabled>
+                    <button onclick="submitPvPWord()" disabled id="pvp-submit-btn">→</button>
+                </div>
+
+                <div class="pvp-abilities">
+                    <button class="pvp-ability-btn" id="ab-1" onclick="useAbility(1)" title="Сменить букву" disabled>🔄</button>
+                    <button class="pvp-ability-btn" id="ab-2" onclick="useAbility(2)" title="Сменить условие" disabled>📝</button>
+                    <button class="pvp-ability-btn" id="ab-3" onclick="useAbility(3)" title="Украсть слово" disabled>🥷</button>
+                    <button class="pvp-ability-btn" id="ab-4" onclick="useAbility(4)" title="Стереть слово" disabled>🗑️</button>
+                </div>
+            </div>
+
+            <!-- Игрок -->
+            <div class="pvp-player me">
+                <div class="pvp-avatar">🧑</div>
+                <div class="pvp-name" id="my-name">Вы</div>
+                <div class="pvp-lives" id="my-lives">❤️❤️❤️</div>
+                <div class="pvp-score" id="my-score">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 6: Рейтинг -->
+    <div id="screen-rating" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="goToMenu()">←</button>
+            <div class="level-info">Рейтинг</div>
+            <div style="width: 24px;"></div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div class="rating-display" id="my-rating">Ваш рейтинг: 1000</div>
+            <div style="font-size: 48px; margin-bottom: 20px;">🏆</div>
+            <div style="color: var(--hint); text-align: center; padding: 0 20px;">
+                Рейтинг начисляется за победы в режиме "Один на один". Чем сложнее слова вы вводите, тем больше очков получаете.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // --- НАСТРОЙКА СЕРВЕРА ---
+        // ВАЖНО: Замените этот URL на адрес вашего развернутого сервера Node.js!
+        const SERVER_URL = 'http://localhost:3000'; 
+        
+        let socket = null;
+
+        // --- ДАННЫЕ ---
+        let dictionary = new Set();
+        let enteredWords = [];
+        
+        let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
+        let currentLevelIndex = 1;
+        
+        let coinBalance = parseInt(localStorage.getItem('wordBattleCoins') || '50');
+        let diamondBalance = parseInt(localStorage.getItem('wordBattleDiamonds') || '0');
+        let playerRating = parseInt(localStorage.getItem('wordBattleRating') || '1000');
+        
+        let currentChapterView = 1;
+        let currentWord = "";
+        let selectedTileElements = [];
+        let letterChangeCount = 0;
+        let hintState = 0;
+        let currentHintWord = "";
+        
+        let pvp = {
+            active: false,
+            isSearching: false,
+            timer: 15,
+            roomId: null
+        };
+
+        const TOTAL_LEVELS = 100;
+        let allLevels = []; 
+
+        function showPopup(title, message) {
+            if (tg.showPopup) {
+                tg.showPopup({ title: title, message: message, buttons: [{ type: 'ok' }] });
+            } else {
+                tg.showAlert(message);
+            }
+        }
+
+        // --- СЕТЕВАЯ ИГРА ---
+        function initSocket() {
+            if (socket) return;
+            
+            socket = io(SERVER_URL);
+
+            socket.on('connect', () => {
+                console.log('Подключено к серверу:', socket.id);
+                // Отправляем данные игрока
+                socket.emit('auth', {
+                    id: tg.initDataUnsafe?.user?.id || 'guest_' + Math.floor(Math.random() * 1000),
+                    name: tg.initDataUnsafe?.user?.first_name || 'Игрок'
+                });
+            });
+
+            socket.on('auth_success', (data) => {
+                console.log('Авторизация успешна:', data);
+                playerRating = data.rating; // Обновляем рейтинг с сервера
+                updateCurrencyUI();
+            });
+
+            socket.on('searching', () => {
+                document.getElementById('pvp-search-overlay').classList.add('active');
+                pvp.isSearching = true;
+            });
+
+            socket.on('match_found', (data) => {
+                document.getElementById('pvp-search-overlay').classList.remove('active');
+                pvp.isSearching = false;
+                pvp.active = true;
+                pvp.roomId = data.roomId;
+
+                document.getElementById('enemy-name').innerText = data.p2Data.name;
+                document.getElementById('my-name').innerText = data.p1Data.name;
+                
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            });
+
+            socket.on('round_start', (data) => {
+                pvp.timer = data.time;
+                document.getElementById('pvp-timer').innerText = pvp.timer;
+                document.getElementById('pvp-timer').classList.remove('danger');
+                document.getElementById('pvp-task-text').innerText = `${data.condition}`;
+                
+                // Разблокируем ввод и способности
+                document.getElementById('pvp-input').disabled = false;
+                document.getElementById('pvp-input').value = '';
+                document.getElementById('pvp-submit-btn').disabled = false;
+                document.getElementById('pvp-input').focus();
+                
+                for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = false;
+
+                // Сброс счета на экране
+                document.getElementById('my-score').innerText = '0';
+                document.getElementById('enemy-score').innerText = '0';
+            });
+
+            socket.on('timer_update', (time) => {
+                pvp.timer = time;
+                document.getElementById('pvp-timer').innerText = time;
+                if (time <= 5) document.getElementById('pvp-timer').classList.add('danger');
+            });
+
+            socket.on('score_update', (data) => {
+                document.getElementById('my-score').innerText = data.p1Score;
+                document.getElementById('enemy-score').innerText = data.p2Score;
+            });
+
+            socket.on('round_end', (data) => {
+                document.getElementById('pvp-input').disabled = true;
+                document.getElementById('pvp-submit-btn').disabled = true;
+                for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = true;
+
+                document.getElementById('my-lives').innerText = '❤️'.repeat(data.p1Lives) + '🖤'.repeat(3 - data.p1Lives);
+                document.getElementById('enemy-lives').innerText = '❤️'.repeat(data.p2Lives) + '🖤'.repeat(3 - data.p2Lives);
+            });
+
+            socket.on('game_over', (data) => {
+                pvp.active = false;
+                const isWin = data.winnerId === socket.id;
+                
+                let ratingChange = isWin ? 25 : -15;
+                let coinReward = isWin ? 50 : 10;
+                
+                playerRating += ratingChange;
+                coinBalance += coinReward;
+                updateCurrencyUI();
+
+                showPopup(
+                    isWin ? '🏆 Победа!' : '💀 Поражение', 
+                    `${isWin ? 'Вы выиграли битву!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`
+                );
+
+                setTimeout(() => { switchScreen('screen-rating'); }, 1000);
+            });
+
+            socket.on('opponent_left', () => {
+                showPopup('Соперник вышел', 'Битва завершена. Вам засчитано техническое поражение.');
+                pvp.active = false;
+                setTimeout(() => goToMenu(), 1500);
+            });
+        }
+
+        function searchPvPMatch() {
+            if (!socket) initSocket();
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            
+            switchScreen('screen-pvp');
+            socket.emit('find_match');
+        }
+
+        function cancelSearch() {
+            if (socket) socket.emit('cancel_search');
+            document.getElementById('pvp-search-overlay').classList.remove('active');
+            pvp.isSearching = false;
+            goToMenu();
+        }
+
+        function quitPvP() {
+            if (pvp.active && socket) {
+                // Если вышли во время игры, считаем как поражение
+                socket.disconnect();
+                socket = null;
+                pvp.active = false;
+            } else if (pvp.isSearching && socket) {
+                socket.emit('cancel_search');
+                pvp.isSearching = false;
+            }
+            goToMenu();
+        }
+
+        function submitPvPWord() {
+            const input = document.getElementById('pvp-input');
+            const word = input.value.trim().toLowerCase();
+            if (!word) return;
+
+            // Отправляем на сервер (сервер сам проверит)
+            socket.emit('submit_word', { word });
+            input.value = '';
+        }
+
+        function useAbility(id) {
+            if (!pvp.active) return;
+            socket.emit('use_ability', id);
+            document.getElementById(`ab-${id}`).disabled = true;
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        // --- ОБНОВЛЕНИЕ UI ---
+        function updateCurrencyUI() {
+            document.getElementById('menu-coins').innerText = coinBalance;
+            document.getElementById('menu-diamonds').innerText = diamondBalance;
+            document.getElementById('levels-coins').innerText = coinBalance;
+            document.getElementById('levels-diamonds').innerText = diamondBalance;
+            document.getElementById('game-coins').innerText = coinBalance;
+            document.getElementById('game-diamonds').innerText = diamondBalance;
+            document.getElementById('shop-coins').innerText = coinBalance;
+            document.getElementById('shop-diamonds').innerText = diamondBalance;
+            document.getElementById('my-rating').innerText = `Ваш рейтинг: ${playerRating}`;
+
+            localStorage.setItem('wordBattleCoins', coinBalance);
+            localStorage.setItem('wordBattleDiamonds', diamondBalance);
+            localStorage.setItem('wordBattleRating', playerRating);
+        }
+
+        // --- СТАРЫЙ ФУНКЦИОНАЛ ---
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function goToMenu() {
+            if (pvp.active) quitPvP();
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            updateMenuUI();
+            switchScreen('screen-menu');
+        }
+
+        function showLevelSelect() { switchScreen('screen-levels'); renderLevelGrid(); }
+        function showShop() { updateCurrencyUI(); switchScreen('screen-shop'); }
+        function showRating() { updateCurrencyUI(); switchScreen('screen-rating'); }
+
+        function updateMenuUI() {
+            const startBtn = document.getElementById('btn-start');
+            if (maxUnlockedLevel > 1) startBtn.innerText = `🎮 Продолжить (Ур. ${maxUnlockedLevel})`;
+            else startBtn.innerText = `🎮 Одиночный режим`;
+        }
+
+        // Заглушка для остальных функций
+        function loadDictionary() { document.getElementById('loading-screen').style.display = 'none'; document.getElementById('btn-start').disabled = false; updateMenuUI(); updateCurrencyUI(); }
+        loadDictionary();
+    </script>
+</body>
+</html>
