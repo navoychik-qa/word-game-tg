@@ -105,9 +105,14 @@
         .action-btn {
             flex: 1; background: rgba(212, 175, 55, 0.1); color: var(--gold);
             border: 1px solid var(--gold); border-radius: 8px; padding: 8px;
-            font-size: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+            font-size: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         .action-btn span { font-size: 10px; opacity: 0.8; }
+        
+        /* Кнопка подсказки (широкая) */
+        .hint-btn {
+            width: 100%; flex: none; padding: 12px; font-size: 14px; flex-direction: row; gap: 10px;
+        }
 
         /* Ввод для Главы 1 */
         .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
@@ -264,9 +269,15 @@
             <div class="task-word" id="current-task">Загрузка...</div>
         </div>
 
-        <div class="action-buttons">
+        <!-- Кнопки способностей для Главы 1 -->
+        <div class="action-buttons" id="ch1-actions">
             <button class="action-btn" onclick="changeLetter()">Сменить букву <span>(10 🪙)</span></button>
             <button class="action-btn" onclick="changeCondition()">Сменить условие <span>(15 🪙)</span></button>
+        </div>
+
+        <!-- Кнопка подсказки для Главы 2 -->
+        <div class="action-buttons" id="ch2-actions" style="display: none;">
+            <button class="action-btn hint-btn" onclick="getHint()">💡 Подсказка (20 🪙)</button>
         </div>
 
         <div class="input-group" id="keyboard-input-group">
@@ -324,6 +335,7 @@
 
         let currentWord = "";
         let selectedTileElements = [];
+        let hintUsedForCurrentWord = false;
 
         const TOTAL_LEVELS = 100;
         const allLevels = [];
@@ -404,7 +416,6 @@
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
             
-            // Глава 1: 1-50
             for (let i = 1; i <= 50; i++) {
                 let type, val, text, target;
                 if (i <= 10) {
@@ -426,7 +437,6 @@
                 allLevels.push({ type, val, text, target });
             }
 
-            // Глава 2: 51-100
             const vowels = 'аеиоуыэюя';
             const consonants = 'бвгджзклмнпрстфхцчшщ';
             const condTypes = ['length', 'startsWith', 'endsWith', 'contains', 'any'];
@@ -436,7 +446,6 @@
                 const poolSize = 8 + Math.floor(idx / 10); 
                 const target = 3 + Math.floor(idx / 17);
                 
-                // Генерируем пул
                 let pool = [];
                 const seed = i * 13;
                 for (let j = 0; j < poolSize; j++) {
@@ -445,7 +454,6 @@
                 }
                 pool.sort(() => Math.random() - 0.5);
 
-                // Выбираем тип условия
                 const condType = condTypes[idx % condTypes.length];
                 let conditionVal = null;
                 let text = "";
@@ -453,19 +461,15 @@
                 if (condType === 'any') {
                     text = `Составь ${target} любых слова`;
                 } else if (condType === 'length') {
-                    conditionVal = 4 + (idx % 3); // 4, 5, 6 букв
+                    conditionVal = 4 + (idx % 3);
                     text = `Составь ${target} слова ровно из ${conditionVal} букв`;
                 } else if (condType === 'startsWith') {
                     conditionVal = pool[Math.floor(Math.random() * pool.length)];
                     text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`;
                 } else if (condType === 'endsWith') {
-                    // Ищем гласную в пуле для окончания
                     const poolVowels = pool.filter(c => vowels.includes(c));
-                    if (poolVowels.length > 0) {
-                        conditionVal = poolVowels[Math.floor(Math.random() * poolVowels.length)];
-                    } else {
-                        conditionVal = pool[pool.length - 1];
-                    }
+                    if (poolVowels.length > 0) conditionVal = poolVowels[Math.floor(Math.random() * poolVowels.length)];
+                    else conditionVal = pool[pool.length - 1];
                     text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`;
                 } else if (condType === 'contains') {
                     conditionVal = pool[Math.floor(Math.random() * pool.length)];
@@ -487,6 +491,16 @@
         // --- УТИЛИТЫ ---
         function normalizeWord(word) {
             return word.toLowerCase().replace(/ё/g, 'е').replace(/[^а-я]/g, ''); 
+        }
+
+        function canFormFromLetters(word, letters) {
+            const poolCount = {};
+            for (let char of letters) poolCount[char] = (poolCount[char] || 0) + 1;
+            for (let char of word) {
+                if (!poolCount[char]) return false;
+                poolCount[char]--;
+            }
+            return true;
         }
 
         function updateBalanceUI() {
@@ -652,6 +666,7 @@
             enteredWords = [];
             currentWord = "";
             selectedTileElements = [];
+            hintUsedForCurrentWord = false;
             document.getElementById('words-container').innerHTML = '';
             document.getElementById('word-input').value = '';
             document.getElementById('current-word-display').innerText = '';
@@ -664,11 +679,15 @@
             const taskTitle = document.getElementById('task-title-text');
             const keyboardGroup = document.getElementById('keyboard-input-group');
             const tilesContainer = document.getElementById('tiles-container');
+            const ch1Actions = document.getElementById('ch1-actions');
+            const ch2Actions = document.getElementById('ch2-actions');
 
             if (level.type === 'letters') {
                 taskTitle.innerText = "Твоё задание:";
                 keyboardGroup.style.display = 'none';
                 tilesContainer.style.display = 'flex';
+                ch1Actions.style.display = 'none';
+                ch2Actions.style.display = 'flex';
                 poolContainer.innerHTML = '';
                 
                 level.val.forEach((letter) => {
@@ -682,6 +701,8 @@
                 taskTitle.innerText = "Твоё задание:";
                 keyboardGroup.style.display = 'flex';
                 tilesContainer.style.display = 'none';
+                ch1Actions.style.display = 'flex';
+                ch2Actions.style.display = 'none';
             }
 
             updateProgress();
@@ -706,6 +727,9 @@
             lastTile.classList.remove('used');
             currentWord = currentWord.slice(0, -1);
             
+            // Если поле полностью очищено, разрешаем снова использовать подсказку
+            if (currentWord === "") hintUsedForCurrentWord = false;
+
             document.getElementById('current-word-display').innerText = currentWord;
             tg.HapticFeedback.impactOccurred('light');
         }
@@ -715,28 +739,75 @@
             checkWord(currentWord, true);
         }
 
+        // --- ПОДСКАЗКА (ГЛАВА 2) ---
+        function getHint() {
+            if (bonusBalance < 20) return tg.showAlert('Недостаточно бонусов! Подсказка стоит 20 🪙.');
+            if (hintUsedForCurrentWord) return tg.showAlert('Вы уже использовали подсказку для этого слова!');
+
+            const level = allLevels[currentLevelIndex - 1];
+            let validWord = null;
+
+            // Ищем подходящее слово в словаре
+            const wordsArray = Array.from(dictionary);
+            
+            for (let w of wordsArray) {
+                if (w.length < 3) continue;
+                if (enteredWords.includes(w)) continue;
+                if (!canFormFromLetters(w, level.val)) continue;
+
+                if (level.condType === 'length' && w.length !== level.condVal) continue;
+                if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
+                if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
+                if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
+
+                validWord = w;
+                break;
+            }
+
+            if (!validWord) {
+                return tg.showAlert('Не удалось найти подходящее слово для подсказки. Попробуйте сами!');
+            }
+
+            // Очищаем текущий ввод перед подсказкой
+            currentWord = "";
+            selectedTileElements.forEach(el => el.classList.remove('used'));
+            selectedTileElements = [];
+            document.getElementById('current-word-display').innerText = '';
+
+            // Берем половину слова (округляя вверх)
+            const halfLength = Math.ceil(validWord.length / 2);
+            const hintPart = validWord.slice(0, halfLength);
+
+            // Автоматически нажимаем на плитки для подсказки
+            for (let char of hintPart) {
+                const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.innerText === char && !el.classList.contains('used'));
+                if (tile) clickTile(tile, char);
+            }
+
+            // Списываем бонусы
+            bonusBalance -= 20;
+            updateBalanceUI();
+            hintUsedForCurrentWord = true;
+            
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
         function updateProgress() {
             const level = allLevels[currentLevelIndex - 1];
             document.getElementById('progress-text').innerText = `Введено: ${enteredWords.length} / ${level.target}`;
         }
 
-        // --- СПОСОБНОСТИ ---
+        // --- СПОСОБНОСТИ ГЛАВЫ 1 ---
         function changeLetter() {
             if (bonusBalance < 10) return tg.showAlert('Недостаточно бонусов!');
             const newLetter = prompt("Введите новую букву (например: А, Б, В...):");
             if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
             
             const level = allLevels[currentLevelIndex - 1];
-            if (level.type === 'letters') {
-                const randomIndex = Math.floor(Math.random() * level.val.length);
-                level.val[randomIndex] = newLetter.toLowerCase();
-                loadLevel(); // Перерисовываем
-            } else {
-                level.type = 'startsWith';
-                level.val = newLetter.toLowerCase();
-                level.text = `Начинается на "${newLetter.toUpperCase()}"`;
-                document.getElementById('current-task').innerText = level.text;
-            }
+            level.type = 'startsWith';
+            level.val = newLetter.toLowerCase();
+            level.text = `Начинается на "${newLetter.toUpperCase()}"`;
+            document.getElementById('current-task').innerText = level.text;
             
             bonusBalance -= 10;
             updateBalanceUI();
@@ -747,7 +818,6 @@
         function changeCondition() {
             if (bonusBalance < 15) return tg.showAlert('Недостаточно бонусов!');
             const level = allLevels[currentLevelIndex - 1];
-            if (level.type === 'letters') return tg.showAlert('В главе 2 нельзя менять условие!');
             
             const conditions = [
                 { type: 'endsWith', val: 'а', text: 'Заканчивается на "А"' },
@@ -786,9 +856,7 @@
 
             const level = allLevels[currentLevelIndex - 1];
             
-            // ПРОВЕРКА УСЛОВИЙ
             if (level.type === 'letters') {
-                // Проверка специфических условий для Главы 2
                 if (level.condType === 'length' && word.length !== level.condVal) {
                     tg.HapticFeedback.notificationOccurred('error');
                     tg.showAlert(`Слово должно состоять ровно из ${level.condVal} букв!`);
@@ -810,7 +878,6 @@
                     return;
                 }
             } else {
-                // Проверка для Главы 1
                 let isValid = false;
                 if (level.type === 'startsWith') isValid = word.startsWith(level.val);
                 else if (level.type === 'endsWith') isValid = word.endsWith(level.val);
@@ -838,6 +905,7 @@
                 currentWord = "";
                 selectedTileElements.forEach(el => el.classList.remove('used'));
                 selectedTileElements = [];
+                hintUsedForCurrentWord = false;
                 document.getElementById('current-word-display').innerText = '';
             } else {
                 input.value = ''; 
@@ -873,7 +941,6 @@
             }
         }
 
-        // Слушатель для 1 главы
         document.getElementById('word-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') checkWord(null, false);
         });
