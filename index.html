@@ -755,51 +755,44 @@
             setTimeout(() => {
                 try {
                     const level = allLevels[currentLevelIndex - 1];
-                    let validWord = null;
+                    let candidates = [];
 
+                    // 1. Ищем строго подходящие под условие слова, которые можно составить
                     for (const w of dictionary) {
-                        if (w.length < 3) continue;
+                        if (w.length < 4) continue; // Не берем слишком короткие
                         if (enteredWords.includes(w)) continue;
                         if (!canFormFromLetters(w, level.val)) continue;
-                        
+
                         if (level.condType === 'length' && w.length !== level.condVal) continue;
                         if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
                         if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
                         if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
 
-                        validWord = w;
-                        break;
+                        candidates.push(w);
                     }
 
-                    if (!validWord) {
-                        for (const w of dictionary) {
-                            if (w.length < 3) continue;
-                            if (enteredWords.includes(w)) continue;
-                            if (canFormFromLetters(w, level.val)) {
-                                validWord = w;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!validWord) {
+                    if (candidates.length === 0) {
                         btn.innerText = originalText;
-                        return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих слов нет.');
+                        return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих под условие слов нет.');
                     }
 
-                    // Очищаем текущий ввод
+                    // 2. Сортируем, чтобы взять самое длинное слово
+                    candidates.sort((a, b) => b.length - a.length);
+                    const bestWord = candidates[0];
+
+                    // 3. Очищаем текущий ввод
                     currentWord = "";
                     selectedTileElements.forEach(el => el.classList.remove('used'));
                     selectedTileElements = [];
                     document.getElementById('current-word-display').innerText = '';
 
-                    const halfLength = Math.ceil(validWord.length / 2);
-                    const hintPart = validWord.slice(0, halfLength);
+                    // 4. Берем ровно половину слова (округляя вверх)
+                    const halfLength = Math.ceil(bestWord.length / 2);
+                    const hintPart = bestWord.slice(0, halfLength);
 
                     let filledAny = false;
                     
                     for (let char of hintPart) {
-                        // Ищем плитку по скрытому атрибуту data-letter
                         const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => 
                             el.dataset.letter === char && 
                             !el.classList.contains('used')
