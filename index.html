@@ -533,13 +533,13 @@
         </div>
     </div>
 
-        <script>
+    <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // --- ССЫЛКА НА ВАШ СЕРВЕР RENDER ---
-        // ВАЖНО: Замените на ссылку вашего сервера!
+        // --- НАСТРОЙКИ СЕРВЕРА ---
+        // ВАЖНО: Ссылка на ваш сервер Render (без слэша на конце)
         const SERVER_URL = 'https://word-game-tg.onrender.com'; 
         
         let socket = null;
@@ -582,13 +582,11 @@
 
             socket.on('auth_success', (data) => {
                 playerRating = data.rating;
-                // Синхронизация баланса из БД сервера
                 if (data.coins !== undefined) coinBalance = data.coins;
                 if (data.diamonds !== undefined) diamondBalance = data.diamonds;
                 updateCurrencyUI();
             });
 
-            // Слушаем, когда пришли деньги от бота
             socket.on(`payment_success_${tg.initDataUnsafe?.user?.id}`, (data) => {
                 coinBalance = data.coins;
                 diamondBalance = data.diamonds;
@@ -601,6 +599,7 @@
                 pvp.isSearching = true;
             });
 
+            // ПРИНЯТИЕ ИГРЫ
             socket.on('match_found_pending', (data) => {
                 document.getElementById('pvp-search-overlay').classList.remove('active');
                 pvp.roomId = data.roomId;
@@ -631,11 +630,13 @@
                 goToMenu();
             });
 
+            // ОТСЧЕТ 3-2-1
             socket.on('countdown_start', (num) => {
                 pvp.active = true;
                 const overlay = document.getElementById('pvp-countdown-overlay');
                 overlay.style.display = 'flex';
                 document.getElementById('countdown-text').innerText = num;
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             });
 
             socket.on('countdown_tick', (num) => {
@@ -647,6 +648,7 @@
                 document.getElementById('pvp-countdown-overlay').style.display = 'none';
             });
 
+            // СТАРТ РАУНДА
             socket.on('round_start', (data) => {
                 document.getElementById('pvp-timer').innerText = data.time;
                 document.getElementById('pvp-timer').classList.remove('danger');
@@ -820,8 +822,6 @@
                 // Открываем окно оплаты Telegram
                 tg.openInvoice(data.invoiceLink, (status) => {
                     if (status === 'paid') {
-                        // Успешная оплата (валюту начислит сервер через вебхук)
-                        // Мы просто показываем сообщение, сервер сам обновит баланс
                         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                     } else if (status === 'cancelled') {
                         showPopup('Отмена', 'Вы отменили покупку.');
@@ -939,7 +939,7 @@
                 }
                 allLevels.push({ type, val, text, target });
             }
-            // Глава 2 (сокращенно, чтобы не раздувать код)
+            // Глава 2
             const vowels = 'аеиоуыэюя'; const consonants = 'бвгджзклмнпрстфхцчшщ';
             const wordsArray = Array.from(dictionary);
             for (let i = 51; i <= 100; i++) {
