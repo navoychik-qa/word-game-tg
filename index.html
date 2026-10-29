@@ -1,3 +1,23 @@
+Время таймера принятия игры (10 секунд) задается в **двух местах**: на сервере (чтобы он ждал ровно столько) и на клиенте (чтобы крутился визуальный счетчик).
+
+Я собрал для вас **полный `index.html`** с уже добавленной кнопкой и таймером (чтобы вы ничего не искали и не ломали). А также покажу, где именно менять время в `server.js`, если вы захотите сделать не 10, а 15 или 20 секунд.
+
+### 1. Где менять время в `server.js`
+Откройте ваш `server.js` и найдите функцию `createPendingRoom`. В самом низу этой функции есть такой блок (я выделил время):
+
+```javascript
+    rooms[roomId].acceptTimer = setTimeout(() => {
+        // ... код штрафа ...
+    }, 10000); // <-- ВОТ ЗДЕСЬ 10000 миллисекунд = 10 секунд.
+```
+Если хотите, чтобы на принятие давалось 15 секунд, поменяйте `10000` на `15000`.
+
+---
+
+### 2. Полный `index.html`
+Замените полностью ваш `index.html` на этот (здесь уже есть и кнопка, и таймер). Не забудьте поменять `SERVER_URL` на ссылку вашего Render.
+
+```html
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -5,7 +25,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Word Battle</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Подключаем Socket.io для PvP -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         /* --- ТЕМЫ --- */
@@ -343,7 +362,6 @@
         <div class="modal-content">
             <div class="modal-title">Соперник найден!</div>
             <div style="font-size: 18px; margin-bottom: 10px;">Принять бой?</div>
-            <!-- НОВЫЙ БЛОК ДЛЯ ТАЙМЕРА -->
             <div style="font-size: 24px; font-weight: bold; color: var(--gold); margin-bottom: 20px;">
                 <span id="accept-timer">10</span> сек
             </div>
@@ -470,19 +488,16 @@
 
         <div class="pvp-screen" style="position: relative;">
             
-            <!-- Оверлей поиска игры -->
             <div id="pvp-search-overlay">
                 <div class="search-spinner"></div>
                 <div style="font-size: 18px; font-weight: bold;">Поиск соперника...</div>
                 <button class="btn" style="width: 60%; margin-top: 20px; background: rgba(255,255,255,0.2);" onclick="cancelSearch()">Отмена</button>
             </div>
 
-            <!-- Оверлей отсчета -->
             <div id="pvp-countdown-overlay">
                 <div id="countdown-text">3</div>
             </div>
 
-            <!-- Враг -->
             <div class="pvp-player enemy">
                 <div class="pvp-name" id="enemy-name">Ожидание...</div>
                 <div class="pvp-lives" id="enemy-lives">❤️❤️❤️</div>
@@ -490,7 +505,6 @@
                 <div class="pvp-avatar">👤</div>
             </div>
 
-            <!-- Таймер и Поле боя -->
             <div class="pvp-timer" id="pvp-timer">15</div>
 
             <div class="pvp-mid">
@@ -511,7 +525,6 @@
                 </div>
             </div>
 
-            <!-- Игрок -->
             <div class="pvp-player me">
                 <div class="pvp-avatar">🧑</div>
                 <div class="pvp-name" id="my-name">Вы</div>
@@ -543,7 +556,6 @@
         tg.expand();
 
         // --- НАСТРОЙКИ СЕРВЕРА ---
-        // ВАЖНО: Ссылка на ваш сервер Render (без слэша на конце)
         const SERVER_URL = 'https://word-game-tg.onrender.com'; 
         
         let socket = null;
@@ -572,7 +584,6 @@
             else tg.showAlert(message);
         }
 
-        // --- СЕТЕВАЯ ИГРА ---
         function initSocket() {
             if (socket) return;
             socket = io(SERVER_URL);
@@ -603,6 +614,7 @@
                 pvp.isSearching = true;
             });
 
+            // --- ОКНО ПРИНЯТИЯ ИГРЫ И ТАЙМЕР ---
             socket.on('match_found_pending', (data) => {
                 document.getElementById('pvp-search-overlay').classList.remove('active');
                 pvp.roomId = data.roomId;
@@ -612,7 +624,6 @@
                 
                 document.getElementById('accept-match-modal').classList.add('active');
                 
-                // ТАЙМЕР
                 let timeLeft = 10;
                 const timerEl = document.getElementById('accept-timer');
                 if (timerEl) timerEl.innerText = timeLeft;
@@ -658,7 +669,6 @@
                 const overlay = document.getElementById('pvp-countdown-overlay');
                 overlay.style.display = 'flex';
                 document.getElementById('countdown-text').innerText = num;
-                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             });
 
             socket.on('countdown_tick', (num) => {
@@ -783,7 +793,6 @@
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
         }
 
-        // --- ОДИНОЧНАЯ ИГРА И МЕНЮ ---
         function updateCurrencyUI() {
             document.querySelectorAll('.menu-coins, #menu-coins, #levels-coins, #game-coins, #shop-coins').forEach(el => el.innerText = coinBalance);
             document.querySelectorAll('.menu-diamonds, #menu-diamonds, #levels-diamonds, #game-diamonds, #shop-diamonds').forEach(el => el.innerText = diamondBalance);
@@ -852,7 +861,6 @@
             showPopup('Успех', 'Вы обменяли 2 💎 на 100 🪙!');
         }
 
-        // --- АДМИНКА ---
         let adminTapCount = 0;
         let adminTapTimer;
         function handleAdminTap() {
@@ -882,7 +890,6 @@
             }
         }
 
-        // --- ТЕМА ---
         function initTheme() {
             const saved = localStorage.getItem('wordBattleTheme') || 'dark';
             document.documentElement.setAttribute('data-theme', saved);
@@ -1202,7 +1209,6 @@
         document.getElementById('word-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') checkWord(null, false); });
         document.getElementById('pvp-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') submitPvPWord(); });
 
-        // Инициализация
         document.getElementById('loading-screen').style.display = 'none'; 
         document.getElementById('btn-start').disabled = false;
         updateCurrencyUI();
@@ -1211,3 +1217,4 @@
     </script>
 </body>
 </html>
+```
