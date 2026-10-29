@@ -1014,8 +1014,17 @@
         function shareRoomCode() {
             const code = document.getElementById('room-code-display').innerText;
             if (!code || code === '...') return;
-            const text = `Привет! Сыграем в Word Battle? Заходи в игру, выбирай "Мультиплеер" -> "1 vs 1" -> "Игра с другом" и вводи код: ${code}`;
-            const url = `https://t.me/share/url?url=${encodeURIComponent(text)}&text=${encodeURIComponent('Присоединяйся к игре!')}`;
+            
+            // Ссылка на вашего бота
+            const botUsername = 'LexyngtonBot'; 
+            
+            // Создаем Deep Link, который сразу откроет игру с кодом
+            const gameLink = `https://t.me/${botUsername}?startapp=${code}`;
+            
+            const text = `Привет! Сыграем в Word Battle? Нажми на ссылку ниже, чтобы сразу присоединиться:`;
+            
+            // Формируем ссылку для шаринга
+            const url = `https://t.me/share/url?url=${encodeURIComponent(gameLink)}&text=${encodeURIComponent(text)}`;
             tg.openTelegramLink(url);
         }
 
@@ -1505,6 +1514,17 @@
 
         document.getElementById('word-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') checkWord(null, false); });
         document.getElementById('pvp-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') submitPvPWord(); });
+
+        // --- ОБРАБОТКА DEEP LINK (startapp) ---
+        if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+            const inviteCode = tg.initDataUnsafe.start_param;
+            if (inviteCode.length === 6) {
+                setTimeout(() => {
+                    switchScreen('screen-friend-menu');
+                    document.getElementById('friend-code-input').value = inviteCode.toUpperCase();
+                }, 1000);
+            }
+        }
 
         document.getElementById('loading-screen').style.display = 'none'; 
         document.getElementById('btn-start').disabled = false;
