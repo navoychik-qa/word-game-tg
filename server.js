@@ -8,7 +8,7 @@ const zlib = require('zlib');
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // Критически важно для парсинга JSON от Telegram
+app.use(express.json()); // Критически важно для Telegram Webhook
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
@@ -18,10 +18,9 @@ const playersDB = {};
 const queue = []; 
 const rooms = {};
 
-// --- ТОКЕН БОТА ---
-// Токен будет браться из переменной окружения на Render (Environment)
+// --- ТОКЕН БОТА (берется из переменных Render) ---
 const BOT_TOKEN = process.env.BOT_TOKEN; 
-if (!BOT_TOKEN) console.warn('⚠️ ВНИМАНИЕ: BOT_TOKEN не задан в переменных окружения!');
+if (!BOT_TOKEN) console.warn('⚠️ BOT_TOKEN не задан!');
 
 // --- ЗАГРУЗКА СЛОВАРЯ ---
 let DICTIONARY = new Set();
@@ -33,13 +32,10 @@ try {
         DICTIONARY = new Set(data.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
         console.log(`Словарь загружен. Слов: ${DICTIONARY.size}`);
     } else {
-        console.log('words.txt.gz не найден. Используется тестовый словарь.');
+        console.log('words.txt.gz не найден. Тестовый словарь.');
         DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот', 'собака', 'привет', 'слово']);
     }
-} catch (e) {
-    console.error('Ошибка загрузки словаря:', e);
-    DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот']);
-}
+} catch (e) { console.error('Ошибка словаря:', e); DICTIONARY = new Set(['крыса', 'кот']); }
 
 // --- ГЕНЕРАТОР ЗАДАНИЙ ---
 const letters = 'абвгдежзиклмнопрстуфхцчшщэюя';
@@ -66,7 +62,6 @@ function generateTask() {
 // API ДЛЯ ОПЛАТЫ (TELEGRAM STARS)
 // ==========================================
 
-// 1. Создание ссылки на оплату
 app.post('/create-invoice', async (req, res) => {
     if (!BOT_TOKEN) return res.status(500).json({ error: 'Бот не настроен' });
     const { userId, packageId } = req.body;
@@ -85,50 +80,37 @@ app.post('/create-invoice', async (req, res) => {
                 title: title,
                 description: 'Покупка валюты в игре Word Battle',
                 payload: JSON.stringify({ userId, packageId }),
-                provider_token: '', // Пустая строка для цифровых товаров
-                currency: 'XTR',    // XTR = Telegram Stars
+                provider_token: '', // Пусто для Stars
+                currency: 'XTR',    // Telegram Stars
                 prices: [{ label: title, amount: amount }]
             })
         });
         const data = await response.json();
-        
         if (data.ok) {
             console.log(`✅ Счет создан для ${userId} (${packageId})`);
             res.json({ invoiceLink: data.result });
         } else {
-            console.error('❌ Ошибка создания счета:', data);
             res.status(500).json({ error: data.description });
         }
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: 'Ошибка сервера при создании счета' });
-    }
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// 2. Вебхук для Telegram (Оплата)
-app.post('/webhook', async (req, res) => {
+// --- ОПТИМИЗИРОВАННЫЙ ВЕБХУК ---
+app.post('/webhook', (req, res) => {
     const update = req.body;
-    console.log('📩 Получено обновление от Telegram:', JSON.stringify(update));
 
-    // ОЧЕНЬ ВАЖНО: Подтверждаем готовность принять платеж за 10 секунд!
+    // 1. МГНОВЕННО подтверждаем оплату
     if (update.pre_checkout_query) {
-        console.log('🔔 Pre-checkout запрос. Подтверждаем...');
-        try {
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerPreCheckoutQuery`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pre_checkout_query_id: update.pre_checkout_query.id,
-                    ok: true 
-                })
-            });
-            console.log('✅ Pre-checkout подтвержден.');
-        } catch (e) {
-            console.error('❌ Ошибка при подтверждении pre-checkout:', e);
-        }
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerPreCheckoutQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pre_checkout_query_id: update.pre_checkout_query.id, ok: true })
+        }).catch(e => console.error('Ошибка подтверждения:', e));
+        
+        return res.sendStatus(200); // Сразу отвечаем Telegram
     }
 
-    // Успешная оплата
+    // 2. Начисляем валюту после успешной оплаты
     if (update.message && update.message.successful_payment) {
         const payment = update.message.successful_payment;
         const payload = JSON.parse(payment.invoice_payload);
@@ -137,30 +119,22 @@ app.post('/webhook', async (req, res) => {
 
         console.log(`💰 ОПЛАТА ПРОШЛА! Игрок: ${userId}, Пакет: ${packageId}`);
 
-        // Начисляем валюту
         if (playersDB[userId]) {
             if (packageId === 'small') { playersDB[userId].coins += 50; }
             else if (packageId === 'medium') { playersDB[userId].coins += 150; playersDB[userId].diamonds += 10; }
             else if (packageId === 'large') { playersDB[userId].coins += 400; playersDB[userId].diamonds += 50; }
             
-            console.log(`🎁 Начислено. Новый баланс:`, playersDB[userId]);
-
-            // Уведомляем клиент (если он онлайн)
             io.emit(`payment_success_${userId}`, { 
                 coins: playersDB[userId].coins, 
                 diamonds: playersDB[userId].diamonds 
             });
-        } else {
-            console.log(`⚠️ Игрок ${userId} не найден в базе (возможно, перезапуск сервера).`);
         }
     }
     res.sendStatus(200);
 });
 
-// --- ИГРОВАЯ ЛОГИКА (Socket.io) ---
+// --- ИГРОВАЯ ЛОГИКА ---
 io.on('connection', (socket) => {
-    console.log('Подключился:', socket.id);
-
     socket.on('auth', (data) => {
         if (!playersDB[data.id]) {
             playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
@@ -213,13 +187,11 @@ io.on('connection', (socket) => {
         if (!room || room.state !== 'playing' || !room.roundActive) return;
         const word = data.word.toLowerCase().trim();
         if (!DICTIONARY.has(word) || room.roundWords.includes(word)) return socket.emit('word_error', 'Нет слова или повтор!');
-
         let isValid = false;
         if (room.task.conditionType === 'startsWith') isValid = word.startsWith(room.task.conditionVal);
         else if (room.task.conditionType === 'endsWith') isValid = word.endsWith(room.task.conditionVal);
         else if (room.task.conditionType === 'contains') isValid = word.includes(room.task.conditionVal);
         if (!isValid) return socket.emit('word_error', 'Не подходит!');
-
         room.roundWords.push(word); room.players[socket.id].score++;
         socket.emit('word_success', word);
         io.to(room.id).emit('score_update', { p1Score: room.players[room.p1].score, p2Score: room.players[room.p2].score });
