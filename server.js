@@ -18,7 +18,7 @@ const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } 
 const playersDB = {}; 
 const queue = []; 
 const rooms = {};
-const privateRooms = {}; // Для игры с другом
+const privateRooms = {}; // Для комнат друзей
 
 // --- ПОДКЛЮЧЕНИЕ К MONGODB ---
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -29,11 +29,13 @@ async function connectDB() {
         console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: MONGODB_URI не задана!');
         return;
     }
+    console.log('⏳ Попытка подключения к MongoDB...');
     try {
         const client = new MongoClient(MONGODB_URI);
         await client.connect();
         db = client.db('wordbattle');
         playersCollection = db.collection('players');
+        
         const allPlayers = await playersCollection.find({}).toArray();
         allPlayers.forEach(p => { playersDB[p.id] = p; });
         console.log(`✅ УСПЕХ: Загружено игроков из БД: ${allPlayers.length}`);
@@ -52,8 +54,9 @@ async function savePlayer(userId) {
 
 // --- ТОКЕН БОТА ---
 const BOT_TOKEN = process.env.BOT_TOKEN; 
+if (!BOT_TOKEN) console.warn('⚠️ BOT_TOKEN не задан!');
 
-// --- СЛОВАРЬ ---
+// --- ЗАГРУЗКА СЛОВАРЯ ---
 let DICTIONARY = new Set();
 try {
     const wordsPath = path.join(__dirname, 'words.txt.gz');
@@ -62,13 +65,17 @@ try {
         const data = zlib.gunzipSync(buffer).toString('utf8');
         DICTIONARY = new Set(data.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
         console.log(`Словарь загружен. Слов: ${DICTIONARY.size}`);
+    } else {
+        console.log('words.txt.gz не найден. Тестовый словарь.');
+        DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот', 'собака', 'привет', 'слово']);
     }
-} catch (e) { console.error('Ошибка словаря:', e); }
+} catch (e) { console.error('Ошибка словаря:', e); DICTIONARY = new Set(['крыса', 'кот']); }
 
 // --- ГЕНЕРАТОР ЗАДАНИЙ ---
 const letters = 'абвгдежзиклмнопрстуфхцчшщэюя';
 const vowels = 'аеиоуыэюя';
 const consonants = 'бвгджзклмнпрстфхцчшщ';
+
 function generateTask() {
     const type = Math.floor(Math.random() * 3);
     let text = '', conditionType = '', conditionVal = '';
@@ -85,7 +92,10 @@ function generateTask() {
     return { conditionType, conditionVal, text };
 }
 
-// --- ОПЛАТА ---
+// ==========================================
+// API ДЛЯ ОПЛАТЫ
+// ==========================================
+
 app.post('/create-invoice', async (req, res) => {
     if (!BOT_TOKEN) return res.status(500).json({ error: 'Бот не настроен' });
     const { userId, packageId } = req.body;
@@ -122,15 +132,20 @@ app.post('/webhook', (req, res) => {
         }).catch(err => console.error(err));
         return res.sendStatus(200);
     }
+
     if (update.message && update.message.successful_payment) {
         const payment = update.message.successful_payment;
         const payload = JSON.parse(payment.invoice_payload);
         const userId = payload.userId;
         const packageId = payload.packageId;
+
+        console.log(`💰 ОПЛАТА ПРОШЛА! Игрок: ${userId}, Пакет: ${packageId}`);
+
         if (playersDB[userId]) {
             if (packageId === 'small') { playersDB[userId].coins += 50; }
             else if (packageId === 'medium') { playersDB[userId].coins += 150; playersDB[userId].diamonds += 10; }
             else if (packageId === 'large') { playersDB[userId].coins += 400; playersDB[userId].diamonds += 50; }
+            
             savePlayer(userId);
             io.emit(`payment_success_${userId}`, { coins: playersDB[userId].coins, diamonds: playersDB[userId].diamonds });
         }
@@ -144,8 +159,9 @@ io.on('connection', (socket) => {
         if (!playersDB[data.id]) {
             if (playersCollection) {
                 const existing = await playersCollection.findOne({ id: data.id });
-                if (existing) playersDB[data.id] = existing;
-                else {
+                if (existing) {
+                    playersDB[data.id] = existing;
+                } else {
                     playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
                     savePlayer(data.id);
                 }
@@ -157,7 +173,7 @@ io.on('connection', (socket) => {
         socket.emit('auth_success', playersDB[data.id]);
     });
 
-    // 1. Поиск случайного игрока
+    // Поиск случайного игрока
     socket.on('find_match', () => {
         if (queue.includes(socket)) return;
         queue.push(socket);
@@ -169,7 +185,7 @@ io.on('connection', (socket) => {
         const index = queue.indexOf(socket); if (index > -1) queue.splice(index, 1);
     });
 
-    // 2. Создание приватной комнаты (Игра с другом)
+    // Создание комнаты друга
     socket.on('create_private_room', () => {
         const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         privateRooms[roomCode] = { host: socket, guest: null, code: roomCode };
@@ -177,7 +193,7 @@ io.on('connection', (socket) => {
         socket.emit('private_room_created', roomCode);
     });
 
-    // 3. Присоединение к приватной комнате
+    // Присоединение к комнате друга
     socket.on('join_private_room', (code) => {
         const room = privateRooms[code.toUpperCase()];
         if (!room) return socket.emit('private_room_error', 'Комната не найдена!');
@@ -187,11 +203,11 @@ io.on('connection', (socket) => {
         room.guest = socket;
         socket.privateRoomCode = room.code;
 
-        // Запускаем игру для обоих
         createPendingRoom(room.host, room.guest, true, room.code);
         delete privateRooms[room.code]; // Удаляем из списка ожидания
     });
 
+    // Подтверждение боя
     socket.on('accept_game', () => {
         const room = rooms[socket.roomId];
         if (!room || room.state !== 'pending') return;
@@ -204,20 +220,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Отказ от боя
     socket.on('decline_game', () => {
         const room = rooms[socket.roomId];
         if (!room || room.state !== 'pending') return;
-        // Штраф только если это случайный игрок
+        
         if (!room.isPrivate && playersDB[socket.userId]) {
             playersDB[socket.userId].rating -= 15;
             savePlayer(socket.userId);
         }
+        
         const opponentId = socket.id === room.p1 ? room.p2 : room.p1;
         const opponentSocket = io.sockets.sockets.get(opponentId);
         if (opponentSocket) { opponentSocket.emit('opponent_declined', 'Соперник отклонил игру.'); opponentSocket.roomId = null; }
         delete rooms[room.id];
     });
 
+    // Ввод слова
     socket.on('submit_word', (data) => {
         const room = rooms[socket.roomId];
         if (!room || room.state !== 'playing' || !room.roundActive) return;
@@ -233,6 +252,7 @@ io.on('connection', (socket) => {
         io.to(room.id).emit('score_update', { p1Score: room.players[room.p1].score, p2Score: room.players[room.p2].score });
     });
 
+    // Способности
     socket.on('use_ability', (type) => {
         const room = rooms[socket.roomId];
         if (!room || room.state !== 'playing' || !room.roundActive) return;
@@ -254,6 +274,7 @@ io.on('connection', (socket) => {
         io.to(room.id).emit('timer_update', room.timeLeft);
     });
 
+    // Рейтинг
     socket.on('get_leaderboard', async () => {
         if (playersCollection) {
             const players = await playersCollection.find({}).sort({ rating: -1 }).limit(100).toArray();
@@ -285,15 +306,11 @@ function createPendingRoom(p1, p2, isPrivate = false, roomCode = null) {
         round: 0
     };
     
-    // Если это приватная игра, не показываем штрафы за отказ
-    const penaltyText = isPrivate ? 'Отклонить' : 'Отклонить (-15 рейтинга)';
-    
     io.to(roomId).emit('match_found_pending', { 
         roomId, 
         p1Data: playersDB[p1.userId], 
         p2Data: playersDB[p2.userId],
-        isPrivate: isPrivate,
-        penaltyText: penaltyText
+        isPrivate: isPrivate
     });
     
     rooms[roomId].acceptTimer = setTimeout(() => {
@@ -367,7 +384,6 @@ function endRound(roomId) {
         const winner = room.players[room.p1].lives > 0 ? room.p1 : room.p2;
         const loser = room.players[room.p1].lives > 0 ? room.p2 : room.p1;
         
-        // Если это НЕ приватная игра, меняем рейтинг
         if (!room.isPrivate) {
             const winnerSocket = io.sockets.sockets.get(winner);
             const loserSocket = io.sockets.sockets.get(loser);
