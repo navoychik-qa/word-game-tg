@@ -174,7 +174,7 @@
         .pvp-player { text-align: center; flex-shrink: 0; }
         .pvp-player.enemy { margin-bottom: 10px; }
         .pvp-player.me { margin-top: 10px; }
-        .pvp-name { font-size: 14px; font-weight: bold; opacity: 0.9; }
+        .pvp-name { font-size: 16px; font-weight: bold; opacity: 0.9; margin-bottom: 2px; }
         .pvp-lives { font-size: 16px; letter-spacing: 2px; margin: 2px 0; }
         .pvp-score { font-size: 28px; font-weight: bold; margin: 5px 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
         .pvp-avatar {
@@ -212,19 +212,46 @@
         }
         .pvp-error-text.show { opacity: 1; }
 
-        .pvp-abilities { display: flex; gap: 6px; margin-bottom: 5px; }
+        .pvp-abilities { display: flex; gap: 8px; margin-bottom: 5px; width: 100%; }
         .pvp-ability-btn {
             flex: 1; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 8px; padding: 8px 0; color: white; font-size: 18px; cursor: pointer;
-            display: flex; justify-content: center; align-items: center;
+            border-radius: 12px; padding: 10px 0; color: white; font-size: 24px; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; height: 50px; box-sizing: border-box;
+            transition: transform 0.1s, background 0.1s;
         }
-        .pvp-ability-btn:active { background: rgba(255,255,255,0.3); }
+        .pvp-ability-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.3); }
         .pvp-ability-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* Тосты (вместо всплывающих окон) */
+        #toast-container {
+            position: absolute; top: 10px; left: 0; width: 100%; display: flex;
+            justify-content: center; z-index: 300; pointer-events: none;
+        }
+        .toast {
+            background: rgba(0,0,0,0.8); color: var(--gold); padding: 10px 20px;
+            border-radius: 20px; font-weight: bold; font-size: 14px;
+            animation: fadeInOut 2s ease-in-out forwards;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
 
         /* Рейтинг */
         .rating-display {
             font-size: 20px; font-weight: bold; color: var(--gold); text-align: center; margin-bottom: 10px;
         }
+        .rating-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; padding-bottom: 20px; }
+        .rating-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--secondary-bg); padding: 12px 15px; border-radius: 8px;
+        }
+        .rating-item.top-1 { background: rgba(255, 215, 0, 0.2); border: 1px solid var(--gold); }
+        .rating-item.top-2 { background: rgba(192, 192, 192, 0.2); border: 1px solid silver; }
+        .rating-item.top-3 { background: rgba(205, 127, 50, 0.2); border: 1px solid #cd7f32; }
+        .rating-search { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--hint); background: var(--secondary-bg); color: var(--text); margin-bottom: 10px; outline: none; }
 
         /* Оверлеи и модалки */
         #pvp-search-overlay {
@@ -360,7 +387,7 @@
     <div class="modal-overlay" id="accept-match-modal">
         <div class="modal-content">
             <div class="modal-title">Соперник найден!</div>
-            <div style="font-size: 18px; margin-bottom: 10px;">Принять бой?</div>
+            <div style="font-size: 18px; margin-bottom: 10px;">Ваш противник: <span id="accept-enemy-name" style="color: var(--gold);">...</span></div>
             <div style="font-size: 24px; font-weight: bold; color: var(--gold); margin-bottom: 20px;">
                 <span id="accept-timer">10</span> сек
             </div>
@@ -487,6 +514,8 @@
 
         <div class="pvp-screen" style="position: relative;">
             
+            <div id="toast-container"></div>
+
             <div id="pvp-search-overlay">
                 <div class="search-spinner"></div>
                 <div style="font-size: 18px; font-weight: bold;">Поиск соперника...</div>
@@ -543,12 +572,12 @@
             <div class="level-info">Рейтинг</div>
             <div style="width: 24px;"></div>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-            <div class="rating-display" id="my-rating">Ваш рейтинг: 1000</div>
-            <div style="font-size: 48px; margin-bottom: 20px;">🏆</div>
-            <div style="color: var(--hint); text-align: center; padding: 0 20px;">
-                Рейтинг начисляется за победы в режиме "Один на один". Чем сложнее слова вы вводите, тем больше очков получаете.
-            </div>
+        
+        <div class="rating-display" id="my-rating">Ваш рейтинг: 1000</div>
+        <input type="text" class="rating-search" id="rating-search" placeholder="Поиск по нику..." oninput="filterRating()">
+        
+        <div class="rating-list" id="rating-list">
+            <!-- Сюда будут загружаться игроки -->
         </div>
     </div>
 
@@ -577,6 +606,8 @@
         let currentHintWord = "";
         let currentLevelIndex = 1;
 
+        let allPlayersData = []; // Для рейтинга
+
         const TOTAL_LEVELS = 100;
         let allLevels = []; 
         let enteredWords = [];
@@ -584,6 +615,16 @@
         function showPopup(title, message) {
             if (tg.showPopup) tg.showPopup({ title, message, buttons: [{ type: 'ok' }] });
             else tg.showAlert(message);
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
         }
 
         function initSocket() {
@@ -620,6 +661,8 @@
                 document.getElementById('pvp-search-overlay').classList.remove('active');
                 pvp.roomId = data.roomId;
                 pvp.isAccepted = false;
+                
+                document.getElementById('accept-enemy-name').innerText = data.p2Data.name;
                 document.getElementById('enemy-name').innerText = data.p2Data.name;
                 document.getElementById('my-name').innerText = data.p1Data.name;
                 
@@ -646,13 +689,13 @@
                 pvp.isAccepted = true;
                 if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
-                // Убрано блокирующее окно
+                showToast('Вы приняли бой. Ожидание соперника...');
             });
 
             socket.on('opponent_declined', (msg) => {
                 if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
-                showPopup('Соперник сбежал', msg);
+                showToast(msg);
                 pvp.active = false;
                 goToMenu();
             });
@@ -660,7 +703,7 @@
             socket.on('match_timeout', (msg) => {
                 if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
-                showPopup('Таймаут', msg);
+                showToast(msg);
                 pvp.active = false;
                 goToMenu();
             });
@@ -709,18 +752,13 @@
                 document.getElementById('enemy-score').innerText = data.p2Score;
             });
 
-            // --- НОВЫЙ ОБРАБОТЧИК ОШИБОК БЕЗ ОКНА ---
             socket.on('word_error', (msg) => {
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-                
                 const input = document.getElementById('pvp-input');
                 const errorText = document.getElementById('pvp-error-text');
-                
                 input.classList.add('error');
                 errorText.innerText = msg;
                 errorText.classList.add('show');
-                
-                // Убираем красную рамку через 1.5 секунды
                 setTimeout(() => {
                     input.classList.remove('error');
                     errorText.classList.remove('show');
@@ -735,7 +773,7 @@
             });
 
             socket.on('ability_used', (data) => {
-                if (data.by !== socket.id) showPopup('Соперник использовал способность!', 'Будьте внимательны.');
+                if (data.by !== socket.id) showToast('Соперник использовал способность!');
             });
 
             socket.on('round_end', (data) => {
@@ -759,9 +797,15 @@
             });
 
             socket.on('opponent_left', () => {
-                showPopup('Соперник вышел', 'Битва завершена.');
+                showToast('Соперник вышел. Битва завершена.');
                 pvp.active = false;
                 setTimeout(() => goToMenu(), 1500);
+            });
+
+            // Получение списка игроков для рейтинга
+            socket.on('leaderboard_data', (players) => {
+                allPlayersData = players;
+                renderLeaderboard(players);
             });
         }
 
@@ -844,7 +888,42 @@
 
         function showLevelSelect() { switchScreen('screen-levels'); renderLevelGrid(); }
         function showShop() { updateCurrencyUI(); switchScreen('screen-shop'); }
-        function showRating() { updateCurrencyUI(); switchScreen('screen-rating'); }
+        
+        function showRating() { 
+            updateCurrencyUI(); 
+            switchScreen('screen-rating'); 
+            if (socket) socket.emit('get_leaderboard');
+        }
+
+        function renderLeaderboard(players) {
+            const list = document.getElementById('rating-list');
+            list.innerHTML = '';
+
+            // Сортируем по убыванию рейтинга
+            players.sort((a, b) => b.rating - a.rating);
+
+            players.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = 'rating-item';
+                if (index === 0) item.classList.add('top-1');
+                else if (index === 1) item.classList.add('top-2');
+                else if (index === 2) item.classList.add('top-3');
+
+                let medal = '';
+                if (index === 0) medal = '🥇 ';
+                else if (index === 1) medal = '🥈 ';
+                else if (index === 2) medal = '🥉 ';
+
+                item.innerHTML = `<span>${medal}${player.name}</span> <span style="color: var(--gold); font-weight: bold;">${player.rating}</span>`;
+                list.appendChild(item);
+            });
+        }
+
+        function filterRating() {
+            const query = document.getElementById('rating-search').value.toLowerCase();
+            const filtered = allPlayersData.filter(p => p.name.toLowerCase().includes(query));
+            renderLeaderboard(filtered);
+        }
 
         function openCurrencyModal() {
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -1236,4 +1315,3 @@
     </script>
 </body>
 </html>
-```
