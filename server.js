@@ -18,6 +18,7 @@ const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } 
 const playersDB = {}; 
 const queue = []; 
 const rooms = {};
+const privateRooms = {}; // Для игры с другом
 
 // --- ПОДКЛЮЧЕНИЕ К MONGODB ---
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -25,18 +26,14 @@ let db, playersCollection;
 
 async function connectDB() {
     if (!MONGODB_URI) {
-        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Переменная MONGODB_URI не задана в Render!');
+        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: MONGODB_URI не задана!');
         return;
     }
-    
-    console.log('⏳ Попытка подключения к MongoDB...');
     try {
         const client = new MongoClient(MONGODB_URI);
         await client.connect();
         db = client.db('wordbattle');
         playersCollection = db.collection('players');
-        
-        // Загружаем всех игроков в память при старте (для быстрого доступа)
         const allPlayers = await playersCollection.find({}).toArray();
         allPlayers.forEach(p => { playersDB[p.id] = p; });
         console.log(`✅ УСПЕХ: Загружено игроков из БД: ${allPlayers.length}`);
@@ -46,25 +43,17 @@ async function connectDB() {
 }
 connectDB();
 
-// Функция для сохранения/обновления игрока в БД
 async function savePlayer(userId) {
     if (!playersCollection || !playersDB[userId]) return;
     try {
-        await playersCollection.updateOne(
-            { id: userId },
-            { $set: playersDB[userId] },
-            { upsert: true }
-        );
-    } catch (e) {
-        console.error('Ошибка сохранения игрока:', e);
-    }
+        await playersCollection.updateOne({ id: userId }, { $set: playersDB[userId] }, { upsert: true });
+    } catch (e) { console.error('Ошибка сохранения игрока:', e); }
 }
 
 // --- ТОКЕН БОТА ---
 const BOT_TOKEN = process.env.BOT_TOKEN; 
-if (!BOT_TOKEN) console.warn('⚠️ BOT_TOKEN не задан!');
 
-// --- ЗАГРУЗКА СЛОВАРЯ ---
+// --- СЛОВАРЬ ---
 let DICTIONARY = new Set();
 try {
     const wordsPath = path.join(__dirname, 'words.txt.gz');
@@ -73,11 +62,8 @@ try {
         const data = zlib.gunzipSync(buffer).toString('utf8');
         DICTIONARY = new Set(data.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
         console.log(`Словарь загружен. Слов: ${DICTIONARY.size}`);
-    } else {
-        console.log('words.txt.gz не найден. Тестовый словарь.');
-        DICTIONARY = new Set(['крыса', 'лампа', 'сок', 'дом', 'кот', 'собака', 'привет', 'слово']);
     }
-} catch (e) { console.error('Ошибка словаря:', e); DICTIONARY = new Set(['крыса', 'кот']); }
+} catch (e) { console.error('Ошибка словаря:', e); }
 
 // --- ГЕНЕРАТОР ЗАДАНИЙ ---
 const letters = 'абвгдежзиклмнопрстуфхцчшщэюя';
@@ -99,10 +85,7 @@ function generateTask() {
     return { conditionType, conditionVal, text };
 }
 
-// ==========================================
-// API ДЛЯ ОПЛАТЫ
-// ==========================================
-
+// --- ОПЛАТА ---
 app.post('/create-invoice', async (req, res) => {
     if (!BOT_TOKEN) return res.status(500).json({ error: 'Бот не настроен' });
     const { userId, packageId } = req.body;
@@ -139,20 +122,15 @@ app.post('/webhook', (req, res) => {
         }).catch(err => console.error(err));
         return res.sendStatus(200);
     }
-
     if (update.message && update.message.successful_payment) {
         const payment = update.message.successful_payment;
         const payload = JSON.parse(payment.invoice_payload);
         const userId = payload.userId;
         const packageId = payload.packageId;
-
-        console.log(`💰 ОПЛАТА ПРОШЛА! Игрок: ${userId}, Пакет: ${packageId}`);
-
         if (playersDB[userId]) {
             if (packageId === 'small') { playersDB[userId].coins += 50; }
             else if (packageId === 'medium') { playersDB[userId].coins += 150; playersDB[userId].diamonds += 10; }
             else if (packageId === 'large') { playersDB[userId].coins += 400; playersDB[userId].diamonds += 50; }
-            
             savePlayer(userId);
             io.emit(`payment_success_${userId}`, { coins: playersDB[userId].coins, diamonds: playersDB[userId].diamonds });
         }
@@ -166,9 +144,8 @@ io.on('connection', (socket) => {
         if (!playersDB[data.id]) {
             if (playersCollection) {
                 const existing = await playersCollection.findOne({ id: data.id });
-                if (existing) {
-                    playersDB[data.id] = existing;
-                } else {
+                if (existing) playersDB[data.id] = existing;
+                else {
                     playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
                     savePlayer(data.id);
                 }
@@ -180,15 +157,39 @@ io.on('connection', (socket) => {
         socket.emit('auth_success', playersDB[data.id]);
     });
 
+    // 1. Поиск случайного игрока
     socket.on('find_match', () => {
         if (queue.includes(socket)) return;
         queue.push(socket);
         socket.emit('searching');
-        if (queue.length >= 2) { const p1 = queue.shift(); const p2 = queue.shift(); createPendingRoom(p1, p2); }
+        if (queue.length >= 2) { const p1 = queue.shift(); const p2 = queue.shift(); createPendingRoom(p1, p2, false); }
     });
 
     socket.on('cancel_search', () => {
         const index = queue.indexOf(socket); if (index > -1) queue.splice(index, 1);
+    });
+
+    // 2. Создание приватной комнаты (Игра с другом)
+    socket.on('create_private_room', () => {
+        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        privateRooms[roomCode] = { host: socket, guest: null, code: roomCode };
+        socket.privateRoomCode = roomCode;
+        socket.emit('private_room_created', roomCode);
+    });
+
+    // 3. Присоединение к приватной комнате
+    socket.on('join_private_room', (code) => {
+        const room = privateRooms[code.toUpperCase()];
+        if (!room) return socket.emit('private_room_error', 'Комната не найдена!');
+        if (room.guest) return socket.emit('private_room_error', 'В комнате уже есть игрок!');
+        if (room.host === socket) return socket.emit('private_room_error', 'Вы не можете подключиться к своей же комнате!');
+
+        room.guest = socket;
+        socket.privateRoomCode = room.code;
+
+        // Запускаем игру для обоих
+        createPendingRoom(room.host, room.guest, true, room.code);
+        delete privateRooms[room.code]; // Удаляем из списка ожидания
     });
 
     socket.on('accept_game', () => {
@@ -206,7 +207,8 @@ io.on('connection', (socket) => {
     socket.on('decline_game', () => {
         const room = rooms[socket.roomId];
         if (!room || room.state !== 'pending') return;
-        if (playersDB[socket.userId]) {
+        // Штраф только если это случайный игрок
+        if (!room.isPrivate && playersDB[socket.userId]) {
             playersDB[socket.userId].rating -= 15;
             savePlayer(socket.userId);
         }
@@ -252,14 +254,11 @@ io.on('connection', (socket) => {
         io.to(room.id).emit('timer_update', room.timeLeft);
     });
 
-    // --- ПОЛУЧЕНИЕ РЕЙТИНГА (ЛИДЕРБОРД) ---
     socket.on('get_leaderboard', async () => {
         if (playersCollection) {
-            // Берем топ-100 игроков из БД, сортируем по рейтингу
             const players = await playersCollection.find({}).sort({ rating: -1 }).limit(100).toArray();
             socket.emit('leaderboard_data', players);
         } else {
-            // Если БД нет, отдаем тех, кто в кэше
             const players = Object.values(playersDB).sort((a, b) => b.rating - a.rating).slice(0, 100);
             socket.emit('leaderboard_data', players);
         }
@@ -267,16 +266,16 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         const index = queue.indexOf(socket); if (index > -1) queue.splice(index, 1);
+        if (socket.privateRoomCode && privateRooms[socket.privateRoomCode]) delete privateRooms[socket.privateRoomCode];
         if (socket.roomId && rooms[socket.roomId]) { io.to(socket.roomId).emit('opponent_left'); delete rooms[socket.roomId]; }
     });
 });
 
-// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-function createPendingRoom(p1, p2) {
+function createPendingRoom(p1, p2, isPrivate = false, roomCode = null) {
     const roomId = `room_${Date.now()}`;
     p1.join(roomId); p2.join(roomId); p1.roomId = roomId; p2.roomId = roomId;
     rooms[roomId] = {
-        id: roomId, p1: p1.id, p2: p2.id,
+        id: roomId, p1: p1.id, p2: p2.id, isPrivate: isPrivate,
         players: {
             [p1.id]: { score: 0, lives: 3, abilities: { 1: true, 2: true, 3: true, 4: true } },
             [p2.id]: { score: 0, lives: 3, abilities: { 1: true, 2: true, 3: true, 4: true } }
@@ -285,7 +284,17 @@ function createPendingRoom(p1, p2) {
         accepted: { [p1.id]: false, [p2.id]: false },
         round: 0
     };
-    io.to(roomId).emit('match_found_pending', { roomId, p1Data: playersDB[p1.userId], p2Data: playersDB[p2.userId] });
+    
+    // Если это приватная игра, не показываем штрафы за отказ
+    const penaltyText = isPrivate ? 'Отклонить' : 'Отклонить (-15 рейтинга)';
+    
+    io.to(roomId).emit('match_found_pending', { 
+        roomId, 
+        p1Data: playersDB[p1.userId], 
+        p2Data: playersDB[p2.userId],
+        isPrivate: isPrivate,
+        penaltyText: penaltyText
+    });
     
     rooms[roomId].acceptTimer = setTimeout(() => {
         const room = rooms[roomId];
@@ -294,8 +303,12 @@ function createPendingRoom(p1, p2) {
         const p2Accepted = room.accepted[room.p2];
         const p1Socket = io.sockets.sockets.get(room.p1);
         const p2Socket = io.sockets.sockets.get(room.p2);
-        if (!p1Accepted && playersDB[p1Socket.userId]) { playersDB[p1Socket.userId].rating -= 15; savePlayer(p1Socket.userId); }
-        if (!p2Accepted && playersDB[p2Socket.userId]) { playersDB[p2Socket.userId].rating -= 15; savePlayer(p2Socket.userId); }
+        
+        if (!isPrivate) {
+            if (!p1Accepted && playersDB[p1Socket.userId]) { playersDB[p1Socket.userId].rating -= 15; savePlayer(p1Socket.userId); }
+            if (!p2Accepted && playersDB[p2Socket.userId]) { playersDB[p2Socket.userId].rating -= 15; savePlayer(p2Socket.userId); }
+        }
+        
         io.to(roomId).emit('match_timeout', 'Вы не успели принять игру.');
         delete rooms[roomId];
     }, 10000);
@@ -353,19 +366,16 @@ function endRound(roomId) {
     if (room.players[room.p1].lives <= 0 || room.players[room.p2].lives <= 0) {
         const winner = room.players[room.p1].lives > 0 ? room.p1 : room.p2;
         const loser = room.players[room.p1].lives > 0 ? room.p2 : room.p1;
-        const winnerSocket = io.sockets.sockets.get(winner);
-        const loserSocket = io.sockets.sockets.get(loser);
         
-        if (winnerSocket && playersDB[winnerSocket.userId]) {
-            playersDB[winnerSocket.userId].rating += 25;
-            savePlayer(winnerSocket.userId);
-        }
-        if (loserSocket && playersDB[loserSocket.userId]) {
-            playersDB[loserSocket.userId].rating -= 15;
-            savePlayer(loserSocket.userId);
+        // Если это НЕ приватная игра, меняем рейтинг
+        if (!room.isPrivate) {
+            const winnerSocket = io.sockets.sockets.get(winner);
+            const loserSocket = io.sockets.sockets.get(loser);
+            if (winnerSocket && playersDB[winnerSocket.userId]) { playersDB[winnerSocket.userId].rating += 25; savePlayer(winnerSocket.userId); }
+            if (loserSocket && playersDB[loserSocket.userId]) { playersDB[loserSocket.userId].rating -= 15; savePlayer(loserSocket.userId); }
         }
         
-        io.to(roomId).emit('game_over', { winnerId: winner, loserId: loser });
+        io.to(roomId).emit('game_over', { winnerId: winner, loserId: loser, isPrivate: room.isPrivate });
         delete rooms[roomId];
     } else {
         setTimeout(() => startRound(roomId), 3000);
