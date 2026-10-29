@@ -14,6 +14,7 @@
             --danger: #e53935; --success: #4CAF50; --gold: #FFD700; --diamond: #00BFFF;
             --locked-bg: #2c3947; --tile-bg: #e2b714; --tile-text: #17212b; --tile-used: #3b4a5a;
             --star: #f39c12; --pvp-bg: linear-gradient(180deg, #2b1055 0%, #7597de 100%);
+            --disabled-btn: #2c3947; --disabled-text: #5a6b7c;
         }
         [data-theme="light"] {
             --bg: #ffffff; --text: #000000; --hint: #999999;
@@ -21,6 +22,7 @@
             --danger: #d32f2f; --success: #388e3c; --gold: #d4af37; --diamond: #0088cc;
             --locked-bg: #e0e0e0; --tile-bg: #f0d470; --tile-text: #000000; --tile-used: #cccccc;
             --star: #e67e22; --pvp-bg: linear-gradient(180deg, #a1c4fd 0%, #c2e9fb 100%);
+            --disabled-btn: #e0e0e0; --disabled-text: #999999;
         }
 
         body {
@@ -253,6 +255,31 @@
         .rating-item.top-3 { background: rgba(205, 127, 50, 0.2); border: 1px solid #cd7f32; }
         .rating-search { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--hint); background: var(--secondary-bg); color: var(--text); margin-bottom: 10px; outline: none; }
 
+        /* Экран Мультиплеера */
+        .mp-menu { display: flex; flex-direction: column; gap: 15px; padding: 10px 0; flex: 1; }
+        .mp-btn {
+            background: var(--btn); color: white; padding: 20px; border-radius: 16px;
+            font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; border: none; transition: transform 0.1s;
+        }
+        .mp-btn:active { transform: scale(0.98); }
+        .mp-btn.disabled {
+            background: var(--disabled-btn); color: var(--disabled-text); cursor: not-allowed;
+        }
+        .mp-btn-disabled-text { font-size: 12px; font-weight: normal; opacity: 0.7; }
+        .mp-btn.rules { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
+
+        /* Экран Правил */
+        .rules-content {
+            background: var(--secondary-bg); padding: 20px; border-radius: 16px;
+            flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6;
+        }
+        .rules-content h3 { color: var(--btn); margin-top: 15px; margin-bottom: 10px; font-size: 18px; }
+        .rules-content p { margin: 0 0 10px 0; }
+        .rules-content ul { padding-left: 20px; margin-bottom: 15px; }
+        .rules-content li { margin-bottom: 8px; }
+        .ability-icon { font-size: 20px; vertical-align: middle; margin-right: 5px; }
+
         /* Оверлеи и модалки */
         #pvp-search-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -412,11 +439,80 @@
         <div class="balance-hint">Нажми, чтобы пополнить</div>
         
         <button id="btn-start" class="btn" onclick="showLevelSelect()" disabled>Загрузка...</button>
-        <button class="btn btn-pvp" onclick="searchPvPMatch()">⚔️ Один на один (PvP)</button>
+        <button class="btn btn-pvp" onclick="showMultiplayerMenu()">⚔️ Мультиплеер</button>
         <button class="btn btn-shop" onclick="showShop()">💎 Обмен валют</button>
         <button class="btn btn-secondary" onclick="showRating()">🏆 Рейтинг игроков</button>
         
         <button id="btn-reset" class="btn btn-reset" onclick="resetProgress()" style="display: none;">Сбросить прогресс</button>
+    </div>
+
+    <!-- ЭКРАН МУЛЬТИПЛЕЕРА -->
+    <div id="screen-multiplayer" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="goToMenu()">←</button>
+            <div class="level-info">Мультиплеер</div>
+            <div style="width: 24px;"></div>
+        </div>
+        
+        <div class="mp-menu">
+            <button class="mp-btn" onclick="searchPvPMatch()">1 vs 1</button>
+            
+            <button class="mp-btn disabled" disabled>
+                1 vs 1 Подбор
+                <span class="mp-btn-disabled-text">Скоро будет</span>
+            </button>
+            
+            <button class="mp-btn disabled" disabled>
+                На выбывание
+                <span class="mp-btn-disabled-text">Скоро будет</span>
+            </button>
+            
+            <button class="mp-btn rules" onclick="showRules()">
+                📖 Правила
+            </button>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ПРАВИЛ -->
+    <div id="screen-rules" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="showMultiplayerMenu()">←</button>
+            <div class="level-info">Правила</div>
+            <div style="width: 24px;"></div>
+        </div>
+        
+        <div class="rules-content">
+            <h3>Режим: 1 vs 1</h3>
+            <p>Битва один на один в реальном времени. Игра сама подбирает вам соперника по сети.</p>
+            
+            <h3>Как играть:</h3>
+            <ul>
+                <li>У каждого игрока по <b>3 жизни</b>.</li>
+                <li>Раунд длится <b>15 секунд</b>.</li>
+                <li>Игра задает букву и условие (например: «Начинается на К»).</li>
+                <li>Вы должны вводить слова, подходящие под условие.</li>
+                <li>Кто больше слов введет за 15 секунд — тот выигрывает раунд.</li>
+                <li>Проигравший в раунде теряет 1 жизнь.</li>
+                <li>Если ничья — теряют жизнь оба.</li>
+                <li>Побеждает тот, кто сохранит хотя бы 1 жизнь, когда у соперника их не останется.</li>
+            </ul>
+
+            <h3>Способности:</h3>
+            <p>У каждого игрока есть 4 способности. Каждую можно использовать <b>только один раз за весь бой</b>.</p>
+            <ul>
+                <li><span class="ability-icon">🔄</span> <b>Сменить букву</b> — меняет текущую букву. Вам и врагу добавляется 10 секунд.</li>
+                <li><span class="ability-icon">📝</span> <b>Сменить условие</b> — меняет условие раунда. Вам и врагу добавляется 10 секунд.</li>
+                <li><span class="ability-icon">🥷</span> <b>Украсть слово</b> — забирает 1 слово у врага, отнимает 3 секунды у вас.</li>
+                <li><span class="ability-icon">🗑️</span> <b>Стереть слово</b> — удаляет 1 слово врага, отнимает 3 секунды у вас.</li>
+            </ul>
+            
+            <h3>Награда:</h3>
+            <ul>
+                <li>За победу вы получаете <b>+25 рейтинга</b> и <b>50 монет 🪙</b>.</li>
+                <li>За поражение вы теряете <b>15 рейтинга</b>, но получаете <b>10 монет 🪙</b>.</li>
+                <li>За отказ от боя (после нажатия «Принять») вы теряете <b>15 рейтинга</b>.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- ЭКРАН 2: Выбор уровней -->
@@ -606,7 +702,7 @@
         let currentHintWord = "";
         let currentLevelIndex = 1;
 
-        let allPlayersData = []; // Для рейтинга
+        let allPlayersData = [];
 
         const TOTAL_LEVELS = 100;
         let allLevels = []; 
@@ -697,7 +793,7 @@
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showToast(msg);
                 pvp.active = false;
-                goToMenu();
+                goToMultiplayerMenu();
             });
 
             socket.on('match_timeout', (msg) => {
@@ -705,7 +801,7 @@
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showToast(msg);
                 pvp.active = false;
-                goToMenu();
+                goToMultiplayerMenu();
             });
 
             socket.on('countdown_start', (num) => {
@@ -793,20 +889,35 @@
                 coinBalance += coinReward;
                 updateCurrencyUI();
                 showPopup(isWin ? '🏆 Победа!' : '💀 Поражение', `${isWin ? 'Вы выиграли!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`);
-                setTimeout(() => { goToMenu(); switchScreen('screen-rating'); }, 1000);
+                setTimeout(() => { goToMultiplayerMenu(); switchScreen('screen-rating'); }, 1000);
             });
 
             socket.on('opponent_left', () => {
                 showToast('Соперник вышел. Битва завершена.');
                 pvp.active = false;
-                setTimeout(() => goToMenu(), 1500);
+                setTimeout(() => goToMultiplayerMenu(), 1500);
             });
 
-            // Получение списка игроков для рейтинга
             socket.on('leaderboard_data', (players) => {
                 allPlayersData = players;
                 renderLeaderboard(players);
             });
+        }
+
+        function showMultiplayerMenu() {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (!socket) initSocket();
+            switchScreen('screen-multiplayer');
+        }
+
+        function goToMultiplayerMenu() {
+            if (pvp.active) quitPvP();
+            switchScreen('screen-multiplayer');
+        }
+
+        function showRules() {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            switchScreen('screen-rules');
         }
 
         function searchPvPMatch() {
@@ -828,19 +939,19 @@
             socket.emit('decline_game');
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             pvp.active = false;
-            goToMenu();
+            goToMultiplayerMenu();
         }
 
         function cancelSearch() {
             if (socket) socket.emit('cancel_search');
             document.getElementById('pvp-search-overlay').classList.remove('active');
-            goToMenu();
+            goToMultiplayerMenu();
         }
 
         function quitPvP() {
             if (pvp.active && socket) { socket.disconnect(); socket = null; pvp.active = false; }
             else if (socket) socket.emit('cancel_search');
-            goToMenu();
+            goToMultiplayerMenu();
         }
 
         function submitPvPWord() {
@@ -899,7 +1010,6 @@
             const list = document.getElementById('rating-list');
             list.innerHTML = '';
 
-            // Сортируем по убыванию рейтинга
             players.sort((a, b) => b.rating - a.rating);
 
             players.forEach((player, index) => {
