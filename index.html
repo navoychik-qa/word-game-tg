@@ -15,6 +15,7 @@
             --locked-bg: #2c3947; --tile-bg: #e2b714; --tile-text: #17212b; --tile-used: #3b4a5a;
             --star: #f39c12; --pvp-bg: linear-gradient(180deg, #2b1055 0%, #7597de 100%);
             --disabled-btn: #2c3947; --disabled-text: #5a6b7c;
+            --overlay-bg: rgba(0,0,0,0.85);
         }
         [data-theme="light"] {
             --bg: #ffffff; --text: #000000; --hint: #999999;
@@ -23,6 +24,7 @@
             --locked-bg: #e0e0e0; --tile-bg: #f0d470; --tile-text: #000000; --tile-used: #cccccc;
             --star: #e67e22; --pvp-bg: linear-gradient(180deg, #a1c4fd 0%, #c2e9fb 100%);
             --disabled-btn: #e0e0e0; --disabled-text: #999999;
+            --overlay-bg: rgba(255,255,255,0.9);
         }
 
         body {
@@ -224,7 +226,7 @@
         .pvp-ability-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.3); }
         .pvp-ability-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        /* Тосты (вместо всплывающих окон) */
+        /* Тосты */
         #toast-container {
             position: absolute; top: 10px; left: 0; width: 100%; display: flex;
             justify-content: center; z-index: 300; pointer-events: none;
@@ -255,7 +257,7 @@
         .rating-item.top-3 { background: rgba(205, 127, 50, 0.2); border: 1px solid #cd7f32; }
         .rating-search { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--hint); background: var(--secondary-bg); color: var(--text); margin-bottom: 10px; outline: none; }
 
-        /* Экран Мультиплеера */
+        /* Мультиплеер */
         .mp-menu { display: flex; flex-direction: column; gap: 15px; padding: 10px 0; flex: 1; }
         .mp-btn {
             background: var(--btn); color: white; padding: 20px; border-radius: 16px;
@@ -269,7 +271,7 @@
         .mp-btn-disabled-text { font-size: 12px; font-weight: normal; opacity: 0.7; }
         .mp-btn.rules { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--hint); }
 
-        /* Экран Правил */
+        /* Правила */
         .rules-content {
             background: var(--secondary-bg); padding: 20px; border-radius: 16px;
             flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6;
@@ -280,10 +282,10 @@
         .rules-content li { margin-bottom: 8px; }
         .ability-icon { font-size: 20px; vertical-align: middle; margin-right: 5px; }
 
-        /* Оверлеи и модалки */
+        /* Экран ожидания / поиска */
         #pvp-search-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 100;
+            background: var(--overlay-bg); z-index: 100;
             display: none; flex-direction: column; justify-content: center; align-items: center;
             border-radius: 16px;
         }
@@ -292,11 +294,12 @@
 
         #pvp-countdown-overlay {
             display: none; position: absolute; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.8); z-index: 200; border-radius: 16px;
+            background: var(--overlay-bg); z-index: 200; border-radius: 16px;
             justify-content: center; align-items: center; flex-direction: column;
         }
         #countdown-text { font-size: 120px; font-weight: bold; color: var(--gold); text-shadow: 0 0 20px rgba(255,215,0,0.5); }
 
+        /* Модалки */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px);
@@ -305,8 +308,13 @@
         .modal-content {
             background: var(--bg); padding: 25px; border-radius: 16px;
             width: 80%; max-width: 300px; text-align: center;
-            border: 1px solid var(--hint); animation: slideIn 0.2s ease-out;
+            border: 1px solid var(--hint);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             max-height: 80vh; overflow-y: auto;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
         .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--gold); }
         .modal-input {
@@ -455,21 +463,56 @@
         </div>
         
         <div class="mp-menu">
-            <button class="mp-btn" onclick="searchPvPMatch()">1 vs 1</button>
-            
+            <button class="mp-btn" onclick="show1v1Menu()">1 vs 1</button>
             <button class="mp-btn disabled" disabled>
                 1 vs 1 Подбор
                 <span class="mp-btn-disabled-text">Скоро будет</span>
             </button>
-            
             <button class="mp-btn disabled" disabled>
                 На выбывание
                 <span class="mp-btn-disabled-text">Скоро будет</span>
             </button>
-            
             <button class="mp-btn rules" onclick="showRules()">
                 📖 Правила
             </button>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ВЫБОРА ПОДРЕЖИМА 1 VS 1 -->
+    <div id="screen-1v1-menu" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="showMultiplayerMenu()">←</button>
+            <div class="level-info">1 vs 1</div>
+            <div style="width: 24px;"></div>
+        </div>
+        
+        <div class="mp-menu">
+            <button class="mp-btn" onclick="startMatchmaking('random')">
+                🎲 Случайный игрок
+                <span class="mp-btn-disabled-text" style="color: var(--gold);">С рейтингом</span>
+            </button>
+            <button class="mp-btn" onclick="startMatchmaking('friend')">
+                🤝 Игра с другом
+                <span class="mp-btn-disabled-text">По ссылке</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ОЖИДАНИЯ (ЛОББИ) -->
+    <div id="screen-pvp-lobby" class="screen">
+        <div class="header">
+            <button class="back-btn" onclick="cancelSearchAndGoBack()">←</button>
+            <div class="level-info">Поиск игры</div>
+            <div style="width: 24px;"></div>
+        </div>
+        
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div class="search-spinner"></div>
+            <div style="font-size: 20px; font-weight: bold; margin-bottom: 10px;" id="lobby-status">Поиск соперника...</div>
+            <div style="font-size: 14px; color: var(--hint); margin-bottom: 20px;" id="lobby-substatus">Пожалуйста, подождите</div>
+            
+            <!-- Кнопка отмены -->
+            <button class="btn btn-secondary" style="width: 60%;" onclick="cancelSearchAndGoBack()">Отмена</button>
         </div>
     </div>
 
@@ -515,7 +558,7 @@
         </div>
     </div>
 
-    <!-- ЭКРАН 2: Выбор уровней -->
+    <!-- ЭКРАН ВЫБОРА УРОВНЕЙ -->
     <div id="screen-levels" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
@@ -533,7 +576,7 @@
         <div class="level-grid" id="level-grid"></div>
     </div>
 
-    <!-- ЭКРАН 3: Игра Одиночная -->
+    <!-- ЭКРАН ИГРЫ (ОДИНОЧНАЯ) -->
     <div id="screen-game" class="screen">
         <div class="header">
             <button class="back-btn" onclick="confirmLeaveLevel()">←</button>
@@ -575,7 +618,7 @@
         <div class="progress" id="progress-text">Введено: 0 / 0</div>
     </div>
 
-    <!-- ЭКРАН 4: Обмен валют -->
+    <!-- ЭКРАН ОБМЕНА ВАЛЮТ -->
     <div id="screen-shop" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
@@ -600,7 +643,7 @@
         </div>
     </div>
 
-    <!-- ЭКРАН 5: PvP (Онлайн) -->
+    <!-- ЭКРАН БИТВЫ PvP -->
     <div id="screen-pvp" class="screen">
         <div class="header">
             <button class="back-btn" onclick="quitPvP()" style="color: white;">←</button>
@@ -612,12 +655,7 @@
             
             <div id="toast-container"></div>
 
-            <div id="pvp-search-overlay">
-                <div class="search-spinner"></div>
-                <div style="font-size: 18px; font-weight: bold;">Поиск соперника...</div>
-                <button class="btn" style="width: 60%; margin-top: 20px; background: rgba(255,255,255,0.2);" onclick="cancelSearch()">Отмена</button>
-            </div>
-
+            <!-- Оверлей для отсчета 3-2-1 -->
             <div id="pvp-countdown-overlay">
                 <div id="countdown-text">3</div>
             </div>
@@ -661,7 +699,7 @@
         </div>
     </div>
 
-    <!-- ЭКРАН 6: Рейтинг -->
+    <!-- ЭКРАН РЕЙТИНГА -->
     <div id="screen-rating" class="screen">
         <div class="header">
             <button class="back-btn" onclick="goToMenu()">←</button>
@@ -748,13 +786,16 @@
                 showPopup('🎉 Оплата получена!', 'Валюты зачислены на ваш счет.');
             });
 
+            // Событие поиска игры (когда мы нажали "Случайный игрок")
             socket.on('searching', () => {
-                document.getElementById('pvp-search-overlay').classList.add('active');
+                switchScreen('screen-pvp-lobby');
+                document.getElementById('lobby-status').innerText = 'Поиск соперника...';
+                document.getElementById('lobby-substatus').innerText = 'Пожалуйста, подождите';
                 pvp.isSearching = true;
             });
 
+            // Событие, когда соперник найден и ждем принятия
             socket.on('match_found_pending', (data) => {
-                document.getElementById('pvp-search-overlay').classList.remove('active');
                 pvp.roomId = data.roomId;
                 pvp.isAccepted = false;
                 
@@ -785,7 +826,9 @@
                 pvp.isAccepted = true;
                 if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
-                showToast('Вы приняли бой. Ожидание соперника...');
+                // Меняем статус в лобби
+                document.getElementById('lobby-status').innerText = 'Ожидание соперника...';
+                document.getElementById('lobby-substatus').innerText = 'Соперник еще не принял бой';
             });
 
             socket.on('opponent_declined', (msg) => {
@@ -793,7 +836,7 @@
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showToast(msg);
                 pvp.active = false;
-                goToMultiplayerMenu();
+                goTo1v1Menu();
             });
 
             socket.on('match_timeout', (msg) => {
@@ -801,11 +844,13 @@
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showToast(msg);
                 pvp.active = false;
-                goToMultiplayerMenu();
+                goTo1v1Menu();
             });
 
+            // Начинается отсчет 3-2-1
             socket.on('countdown_start', (num) => {
                 pvp.active = true;
+                switchScreen('screen-pvp'); // Переключаемся на экран боя ТОЛЬКО сейчас
                 const overlay = document.getElementById('pvp-countdown-overlay');
                 overlay.style.display = 'flex';
                 document.getElementById('countdown-text').innerText = num;
@@ -895,7 +940,7 @@
             socket.on('opponent_left', () => {
                 showToast('Соперник вышел. Битва завершена.');
                 pvp.active = false;
-                setTimeout(() => goToMultiplayerMenu(), 1500);
+                setTimeout(() => goTo1v1Menu(), 1500);
             });
 
             socket.on('leaderboard_data', (players) => {
@@ -910,6 +955,15 @@
             switchScreen('screen-multiplayer');
         }
 
+        function show1v1Menu() {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            switchScreen('screen-1v1-menu');
+        }
+
+        function goTo1v1Menu() {
+            switchScreen('screen-1v1-menu');
+        }
+
         function goToMultiplayerMenu() {
             if (pvp.active) quitPvP();
             switchScreen('screen-multiplayer');
@@ -920,11 +974,23 @@
             switchScreen('screen-rules');
         }
 
-        function searchPvPMatch() {
+        function startMatchmaking(type) {
             if (!socket) initSocket();
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            switchScreen('screen-pvp');
-            socket.emit('find_match');
+            
+            if (type === 'random') {
+                socket.emit('find_match');
+            } else {
+                showPopup('В разработке', 'Игра с другом появится в ближайшем обновлении!');
+                // Здесь будет логика создания приватной комнаты (socket.emit('create_private_room'))
+            }
+        }
+
+        function cancelSearchAndGoBack() {
+            if (socket) socket.emit('cancel_search');
+            if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
+            document.getElementById('accept-match-modal').classList.remove('active');
+            goTo1v1Menu();
         }
 
         function acceptMatch() {
@@ -939,19 +1005,13 @@
             socket.emit('decline_game');
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             pvp.active = false;
-            goToMultiplayerMenu();
-        }
-
-        function cancelSearch() {
-            if (socket) socket.emit('cancel_search');
-            document.getElementById('pvp-search-overlay').classList.remove('active');
-            goToMultiplayerMenu();
+            goTo1v1Menu();
         }
 
         function quitPvP() {
             if (pvp.active && socket) { socket.disconnect(); socket = null; pvp.active = false; }
             else if (socket) socket.emit('cancel_search');
-            goToMultiplayerMenu();
+            goTo1v1Menu();
         }
 
         function submitPvPWord() {
