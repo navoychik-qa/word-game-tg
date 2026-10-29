@@ -1016,12 +1016,12 @@
             if (!code || code === '...') return;
             
             // Ссылка на вашего бота
-            const botUsername = 'LexyngtonBot'; 
+            const botUsername = 'WordWarGame'; 
             
             // Создаем Deep Link, который сразу откроет игру с кодом
             const gameLink = `https://t.me/${botUsername}?startapp=${code}`;
             
-            const text = `Привет! Сыграем в Word Battle? Нажми на ссылку ниже, чтобы сразу присоединиться:`;
+            const text = `Привет! Сыграем в Word War? Нажми на ссылку ниже, чтобы сразу присоединиться:`;
             
             // Формируем ссылку для шаринга
             const url = `https://t.me/share/url?url=${encodeURIComponent(gameLink)}&text=${encodeURIComponent(text)}`;
