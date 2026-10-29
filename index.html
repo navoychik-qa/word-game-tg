@@ -1,21 +1,10 @@
-Время таймера принятия игры (10 секунд) задается в **двух местах**: на сервере (чтобы он ждал ровно столько) и на клиенте (чтобы крутился визуальный счетчик).
+Вы абсолютно правы. В PvP каждая секунда на счету, и системные окна Telegram (которые нужно закрывать вручную) полностью убивают динамику. 
 
-Я собрал для вас **полный `index.html`** с уже добавленной кнопкой и таймером (чтобы вы ничего не искали и не ломали). А также покажу, где именно менять время в `server.js`, если вы захотите сделать не 10, а 15 или 20 секунд.
+Я переписал PvP-часть так, чтобы **убрать все блокирующие окна**:
+1. Окно «Вы приняли бой, ожидайте» **полностью удалено**. Если вы нажали «Принять», игра просто ждет второго игрока. Когда оба готовы, начинается отсчет 3-2-1.
+2. Ошибки при вводе слов (например, «Слова нет в словаре») больше не показываются через `alert`. Теперь, если слово неверное, поле ввода **встряхивается, подсвечивается красным**, и под ним появляется красный текст с ошибкой. Введенный текст **не стирается** (чтобы вы могли исправить одну букву, а не писать заново).
 
-### 1. Где менять время в `server.js`
-Откройте ваш `server.js` и найдите функцию `createPendingRoom`. В самом низу этой функции есть такой блок (я выделил время):
-
-```javascript
-    rooms[roomId].acceptTimer = setTimeout(() => {
-        // ... код штрафа ...
-    }, 10000); // <-- ВОТ ЗДЕСЬ 10000 миллисекунд = 10 секунд.
-```
-Если хотите, чтобы на принятие давалось 15 секунд, поменяйте `10000` на `15000`.
-
----
-
-### 2. Полный `index.html`
-Замените полностью ваш `index.html` на этот (здесь уже есть и кнопка, и таймер). Не забудьте поменять `SERVER_URL` на ссылку вашего Render.
+Вот полностью обновленный `index.html`. Замените ваш файл на этот:
 
 ```html
 <!DOCTYPE html>
@@ -212,14 +201,25 @@
         
         .pvp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         
-        .pvp-word-input { width: 100%; display: flex; gap: 5px; margin-bottom: 5px; }
+        .pvp-word-input { width: 100%; display: flex; flex-direction: column; gap: 5px; margin-bottom: 5px; }
+        .pvp-input-wrapper { display: flex; gap: 5px; width: 100%; }
         .pvp-word-input input {
-            flex: 1; padding: 12px; border-radius: 8px; border: none;
-            background: rgba(0,0,0,0.5); color: white; font-size: 16px; text-align: center;
+            flex: 1; padding: 12px; border-radius: 8px; border: 2px solid transparent;
+            background: rgba(0,0,0,0.5); color: white; font-size: 16px; text-align: center; outline: none;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .pvp-word-input input.error {
+            border-color: var(--danger); background: rgba(229, 57, 53, 0.2);
+            animation: shake 0.3s;
         }
         .pvp-word-input button {
             background: var(--btn); border: none; color: white; padding: 0 20px; border-radius: 8px; font-size: 20px; font-weight: bold;
         }
+        .pvp-error-text {
+            color: var(--danger); font-size: 14px; font-weight: bold; text-align: center;
+            height: 20px; opacity: 0; transition: opacity 0.2s;
+        }
+        .pvp-error-text.show { opacity: 1; }
 
         .pvp-abilities { display: flex; gap: 6px; margin-bottom: 5px; }
         .pvp-ability-btn {
@@ -302,6 +302,14 @@
         .buy-option-price {
             background: var(--star); color: #000; padding: 6px 12px;
             border-radius: 6px; font-weight: bold; font-size: 14px;
+        }
+        
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
         }
     </style>
 </head>
@@ -513,8 +521,11 @@
                 </div>
                 
                 <div class="pvp-word-input">
-                    <input type="text" id="pvp-input" placeholder="Введи слово..." autocomplete="off" disabled>
-                    <button onclick="submitPvPWord()" disabled id="pvp-submit-btn">→</button>
+                    <div class="pvp-input-wrapper">
+                        <input type="text" id="pvp-input" placeholder="Введи слово..." autocomplete="off" disabled>
+                        <button onclick="submitPvPWord()" disabled id="pvp-submit-btn">→</button>
+                    </div>
+                    <div class="pvp-error-text" id="pvp-error-text">Такого слова нет!</div>
                 </div>
 
                 <div class="pvp-abilities">
@@ -614,7 +625,6 @@
                 pvp.isSearching = true;
             });
 
-            // --- ОКНО ПРИНЯТИЯ ИГРЫ И ТАЙМЕР ---
             socket.on('match_found_pending', (data) => {
                 document.getElementById('pvp-search-overlay').classList.remove('active');
                 pvp.roomId = data.roomId;
@@ -645,7 +655,7 @@
                 pvp.isAccepted = true;
                 if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
-                showPopup('Ожидание', 'Вы приняли бой. Ждем соперника...');
+                // Убрано блокирующее окно
             });
 
             socket.on('opponent_declined', (msg) => {
@@ -669,6 +679,7 @@
                 const overlay = document.getElementById('pvp-countdown-overlay');
                 overlay.style.display = 'flex';
                 document.getElementById('countdown-text').innerText = num;
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             });
 
             socket.on('countdown_tick', (num) => {
@@ -688,6 +699,8 @@
                 document.getElementById('enemy-score').innerText = '0';
                 document.getElementById('pvp-input').disabled = false;
                 document.getElementById('pvp-input').value = '';
+                document.getElementById('pvp-input').classList.remove('error');
+                document.getElementById('pvp-error-text').classList.remove('show');
                 document.getElementById('pvp-submit-btn').disabled = false;
                 document.getElementById('pvp-input').focus();
                 for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = false;
@@ -705,14 +718,29 @@
                 document.getElementById('enemy-score').innerText = data.p2Score;
             });
 
+            // --- НОВЫЙ ОБРАБОТЧИК ОШИБОК БЕЗ ОКНА ---
             socket.on('word_error', (msg) => {
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-                showPopup('Ошибка', msg);
+                
+                const input = document.getElementById('pvp-input');
+                const errorText = document.getElementById('pvp-error-text');
+                
+                input.classList.add('error');
+                errorText.innerText = msg;
+                errorText.classList.add('show');
+                
+                // Убираем красную рамку через 1.5 секунды
+                setTimeout(() => {
+                    input.classList.remove('error');
+                    errorText.classList.remove('show');
+                }, 1500);
             });
 
             socket.on('word_success', () => {
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 document.getElementById('pvp-input').value = '';
+                document.getElementById('pvp-input').classList.remove('error');
+                document.getElementById('pvp-error-text').classList.remove('show');
             });
 
             socket.on('ability_used', (data) => {
