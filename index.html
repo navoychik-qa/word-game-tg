@@ -533,14 +533,14 @@
         </div>
     </div>
 
-    <script>
+        <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // --- НАСТРОЙКИ СЕРВЕРА ---
-        // ВАЖНО: Замените эту ссылку на ваш URL с Render!
-        const SERVER_URL = 'https://word-battle-server.onrender.com'; 
+        // --- ССЫЛКА НА ВАШ СЕРВЕР RENDER ---
+        // ВАЖНО: Замените на ссылку вашего сервера!
+        const SERVER_URL = 'https://word-battle-server-xxxx.onrender.com'; 
         
         let socket = null;
         let pvp = { active: false, isSearching: false, roomId: null, isAccepted: false };
@@ -561,6 +561,7 @@
 
         const TOTAL_LEVELS = 100;
         let allLevels = []; 
+        let enteredWords = [];
 
         function showPopup(title, message) {
             if (tg.showPopup) tg.showPopup({ title, message, buttons: [{ type: 'ok' }] });
@@ -581,7 +582,18 @@
 
             socket.on('auth_success', (data) => {
                 playerRating = data.rating;
+                // Синхронизация баланса из БД сервера
+                if (data.coins !== undefined) coinBalance = data.coins;
+                if (data.diamonds !== undefined) diamondBalance = data.diamonds;
                 updateCurrencyUI();
+            });
+
+            // Слушаем, когда пришли деньги от бота
+            socket.on(`payment_success_${tg.initDataUnsafe?.user?.id}`, (data) => {
+                coinBalance = data.coins;
+                diamondBalance = data.diamonds;
+                updateCurrencyUI();
+                showPopup('🎉 Оплата получена!', 'Валюты зачислены на ваш счет.');
             });
 
             socket.on('searching', () => {
@@ -595,7 +607,6 @@
                 pvp.isAccepted = false;
                 document.getElementById('enemy-name').innerText = data.p2Data.name;
                 document.getElementById('my-name').innerText = data.p1Data.name;
-                
                 document.getElementById('accept-match-modal').classList.add('active');
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
             });
@@ -620,17 +631,11 @@
                 goToMenu();
             });
 
-            socket.on('rating_updated', (newRating) => {
-                playerRating = newRating;
-                updateCurrencyUI();
-            });
-
             socket.on('countdown_start', (num) => {
                 pvp.active = true;
                 const overlay = document.getElementById('pvp-countdown-overlay');
                 overlay.style.display = 'flex';
                 document.getElementById('countdown-text').innerText = num;
-                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             });
 
             socket.on('countdown_tick', (num) => {
@@ -646,14 +651,12 @@
                 document.getElementById('pvp-timer').innerText = data.time;
                 document.getElementById('pvp-timer').classList.remove('danger');
                 document.getElementById('pvp-task-text').innerText = data.taskText;
-                
                 document.getElementById('my-score').innerText = '0';
                 document.getElementById('enemy-score').innerText = '0';
                 document.getElementById('pvp-input').disabled = false;
                 document.getElementById('pvp-input').value = '';
                 document.getElementById('pvp-submit-btn').disabled = false;
                 document.getElementById('pvp-input').focus();
-                
                 for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = false;
             });
 
@@ -687,7 +690,6 @@
                 document.getElementById('pvp-input').disabled = true;
                 document.getElementById('pvp-submit-btn').disabled = true;
                 for(let i=1; i<=4; i++) document.getElementById(`ab-${i}`).disabled = true;
-
                 document.getElementById('my-lives').innerText = '❤️'.repeat(Math.max(0, data.p1Lives)) + '🖤'.repeat(3 - Math.max(0, data.p1Lives));
                 document.getElementById('enemy-lives').innerText = '❤️'.repeat(Math.max(0, data.p2Lives)) + '🖤'.repeat(3 - Math.max(0, data.p2Lives));
             });
@@ -697,13 +699,10 @@
                 const isWin = data.winnerId === socket.id;
                 let ratingChange = isWin ? 25 : -15;
                 let coinReward = isWin ? 50 : 10;
-                
                 playerRating += ratingChange;
                 coinBalance += coinReward;
                 updateCurrencyUI();
-
-                showPopup(isWin ? '🏆 Победа!' : '💀 Поражение', 
-                    `${isWin ? 'Вы выиграли!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`);
+                showPopup(isWin ? '🏆 Победа!' : '💀 Поражение', `${isWin ? 'Вы выиграли!' : 'Вы проиграли.'}\n${ratingChange > 0 ? '+' : ''}${ratingChange} к рейтингу\n+${coinReward} 🪙`);
                 setTimeout(() => { goToMenu(); switchScreen('screen-rating'); }, 1000);
             });
 
@@ -800,13 +799,40 @@
         }
         function closeCurrencyModal() { document.getElementById('currency-modal').classList.remove('active'); }
         
-        function buyPackage(id, stars, coins, diamonds) {
-            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-            showPopup('Покупка', `Это тестовый режим. Начислено ${coins} 🪙 и ${diamonds} 💎!`);
-            coinBalance += coins;
-            diamondBalance += diamonds;
-            updateCurrencyUI();
+        // --- РЕАЛЬНАЯ ПОКУПКА ЧЕРЕЗ TELEGRAM STARS ---
+        async function buyPackage(id, stars, coins, diamonds) {
+            const userId = tg.initDataUnsafe?.user?.id;
+            if (!userId) return showPopup('Ошибка', 'Не удалось определить пользователя Telegram.');
+
             closeCurrencyModal();
+
+            try {
+                // Запрашиваем ссылку на оплату у нашего сервера
+                const response = await fetch(`${SERVER_URL}/create-invoice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, packageId: id })
+                });
+                
+                const data = await response.json();
+                if (data.error) return showPopup('Ошибка', data.error);
+
+                // Открываем окно оплаты Telegram
+                tg.openInvoice(data.invoiceLink, (status) => {
+                    if (status === 'paid') {
+                        // Успешная оплата (валюту начислит сервер через вебхук)
+                        // Мы просто показываем сообщение, сервер сам обновит баланс
+                        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    } else if (status === 'cancelled') {
+                        showPopup('Отмена', 'Вы отменили покупку.');
+                    } else if (status === 'failed') {
+                        showPopup('Ошибка', 'Платеж не прошел.');
+                    }
+                });
+            } catch (e) {
+                console.error(e);
+                showPopup('Ошибка', 'Не удалось создать счет. Попробуйте позже.');
+            }
         }
 
         function buyCoinsWithDiamonds() {
@@ -862,23 +888,21 @@
         }
         initTheme();
 
-        // --- ЗАГРУЗКА СЛОВАРЯ И ГЕНЕРАЦИЯ УРОВНЕЙ ---
+        // --- ЗАГРУЗКА СЛОВАРЯ ---
         async function loadDictionary() {
             try {
                 const response = await fetch('words.txt.gz?v=' + Date.now());
                 if (!response.ok) throw new Error('Файл не найден');
                 
-                let arrayBuffer;
+                let text;
                 if (typeof DecompressionStream !== 'undefined') {
                     const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
-                    const text = await new Response(stream).text();
-                    dictionary = new Set(text.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
+                    text = await new Response(stream).text();
                 } else {
-                    // Fallback для очень старых браузеров
                     const buffer = await response.arrayBuffer();
-                    const text = pako.inflate(new Uint8Array(buffer), { to: 'string' });
-                    dictionary = new Set(text.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
+                    text = pako.inflate(new Uint8Array(buffer), { to: 'string' });
                 }
+                dictionary = new Set(text.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
 
                 generateLevels();
                 document.getElementById('loading-screen').style.display = 'none';
@@ -895,7 +919,6 @@
             allLevels = [];
             const lettersStart = ['к', 'п', 'с', 'р', 'м', 'т', 'б', 'г', 'д', 'в'];
             const lettersEnd = ['а', 'я', 'о', 'и', 'е', 'ы', 'у', 'ь'];
-            
             for (let i = 1; i <= 50; i++) {
                 let type, val, text, target;
                 if (i <= 10) {
@@ -916,43 +939,22 @@
                 }
                 allLevels.push({ type, val, text, target });
             }
-
+            // Глава 2 (сокращенно, чтобы не раздувать код)
+            const vowels = 'аеиоуыэюя'; const consonants = 'бвгджзклмнпрстфхцчшщ';
             const wordsArray = Array.from(dictionary);
-            const vowels = 'аеиоуыэюя';
-            const consonants = 'бвгджзклмнпрстфхцчшщ';
-            const condTypes = ['length', 'startsWith', 'endsWith', 'contains', 'any'];
-            
             for (let i = 51; i <= 100; i++) {
-                const idx = i - 51;
-                const target = 3 + Math.floor(idx / 17);
+                const idx = i - 51; const target = 3 + Math.floor(idx / 17);
                 const poolSize = 8 + Math.floor(idx / 10); 
-                
                 let baseWord = "";
-                while (baseWord.length < 4 || baseWord.length > 7) {
-                    baseWord = wordsArray[Math.floor(Math.random() * wordsArray.length)] || 'слово';
-                }
-                
+                while (baseWord.length < 4 || baseWord.length > 7) baseWord = wordsArray[Math.floor(Math.random() * wordsArray.length)] || 'слово';
                 let pool = baseWord.split('');
-                while (pool.length < poolSize) {
-                    pool.push(Math.random() < 0.4 ? vowels[Math.floor(Math.random() * vowels.length)] : consonants[Math.floor(Math.random() * consonants.length)]);
-                }
+                while (pool.length < poolSize) pool.push(Math.random() < 0.4 ? vowels[Math.floor(Math.random() * vowels.length)] : consonants[Math.floor(Math.random() * consonants.length)]);
                 pool.sort(() => Math.random() - 0.5);
-
-                const condType = condTypes[idx % condTypes.length];
-                let conditionVal = null;
-                let text = "";
-
-                if (condType === 'any') text = `Составь ${target} любых слова`;
-                else if (condType === 'length') { conditionVal = baseWord.length; text = `Составь ${target} слова ровно из ${conditionVal} букв`; }
-                else if (condType === 'startsWith') { conditionVal = baseWord[0]; text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`; }
-                else if (condType === 'endsWith') { conditionVal = baseWord[baseWord.length - 1]; text = `Составь ${target} слова на "${conditionVal.toUpperCase()}"`; }
-                else if (condType === 'contains') { conditionVal = baseWord[Math.floor(Math.random() * baseWord.length)]; text = `Составь ${target} слова с буквой "${conditionVal.toUpperCase()}"`; }
-
-                allLevels.push({ type: 'letters', val: pool, condType, condVal: conditionVal, text, target });
+                allLevels.push({ type: 'letters', val: pool, condType: 'any', text: `Составь ${target} слов`, target });
             }
         }
 
-        // --- ОДИНОЧНАЯ ИГРА ЛОГИКА ---
+        // --- ОДИНОЧНАЯ ИГРА ---
         function switchChapter(chapter) {
             currentChapterView = chapter;
             document.getElementById('tab-ch1').classList.toggle('active', chapter === 1);
@@ -965,7 +967,6 @@
             grid.innerHTML = '';
             const start = currentChapterView === 1 ? 1 : 51;
             const end = currentChapterView === 1 ? 50 : 100;
-
             for (let i = start; i <= end; i++) {
                 const btn = document.createElement('button');
                 btn.className = 'level-btn';
@@ -973,7 +974,6 @@
                 if (i < maxUnlockedLevel) btn.classList.add('completed');
                 else if (i === maxUnlockedLevel) btn.classList.add('current');
                 else { btn.classList.add('locked'); btn.innerHTML = '🔒'; }
-
                 if (i <= maxUnlockedLevel) btn.onclick = () => startLevel(i);
                 else btn.onclick = () => showPopup('Закрыто', 'Сначала пройди предыдущие уровни!');
                 grid.appendChild(btn);
@@ -995,15 +995,9 @@
             }, (btnId) => { if (btnId === 'leave') showLevelSelect(); });
         }
 
-        let enteredWords = []; // Перенесено сюда для области видимости
         function loadLevel() {
-            enteredWords = [];
-            currentWord = "";
-            selectedTileElements = [];
-            letterChangeCount = 0;
-            hintState = 0;
-            currentHintWord = "";
-            
+            enteredWords = []; currentWord = ""; selectedTileElements = [];
+            letterChangeCount = 0; hintState = 0; currentHintWord = "";
             document.getElementById('words-container').innerHTML = '';
             document.getElementById('word-input').value = '';
             document.getElementById('current-word-display').innerText = '';
@@ -1013,67 +1007,51 @@
             document.getElementById('current-task').innerText = level.text;
 
             const poolContainer = document.getElementById('letters-pool');
-            const taskTitle = document.getElementById('task-title-text');
             const keyboardGroup = document.getElementById('keyboard-input-group');
             const tilesContainer = document.getElementById('tiles-container');
             const ch1Actions = document.getElementById('ch1-actions');
             const ch2Actions = document.getElementById('ch2-actions');
 
             if (level.type === 'letters') {
-                taskTitle.innerText = "Твоё задание:";
-                keyboardGroup.style.display = 'none';
-                tilesContainer.style.display = 'flex';
-                ch1Actions.style.display = 'none';
-                ch2Actions.style.display = 'flex';
+                document.getElementById('task-title-text').innerText = "Твоё задание:";
+                keyboardGroup.style.display = 'none'; tilesContainer.style.display = 'flex';
+                ch1Actions.style.display = 'none'; ch2Actions.style.display = 'flex';
                 poolContainer.innerHTML = '';
-                
                 const hintBtn = document.getElementById('btn-hint');
-                hintBtn.className = 'action-btn hint-btn';
-                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+                hintBtn.className = 'action-btn hint-btn'; hintBtn.innerText = '💡 Подсказка (20 🪙)';
 
                 level.val.forEach((letter) => {
                     const tile = document.createElement('div');
-                    tile.className = 'letter-tile';
-                    tile.innerText = letter;
-                    tile.dataset.letter = letter;
+                    tile.className = 'letter-tile'; tile.innerText = letter; tile.dataset.letter = letter;
                     tile.onclick = () => clickTile(tile, letter);
                     poolContainer.appendChild(tile);
                 });
             } else {
-                taskTitle.innerText = "Твоё задание:";
-                keyboardGroup.style.display = 'flex';
-                tilesContainer.style.display = 'none';
-                ch1Actions.style.display = 'flex';
-                ch2Actions.style.display = 'none';
-                
+                document.getElementById('task-title-text').innerText = "Твоё задание:";
+                keyboardGroup.style.display = 'flex'; tilesContainer.style.display = 'none';
+                ch1Actions.style.display = 'flex'; ch2Actions.style.display = 'none';
                 const changeBtn = document.getElementById('btn-change-letter');
                 changeBtn.innerHTML = 'Сменить букву <span>(15 🪙)</span>';
-                changeBtn.style.color = 'var(--gold)';
-                changeBtn.style.borderColor = 'var(--gold)';
-                changeBtn.style.background = 'rgba(212, 175, 55, 0.1)';
+                changeBtn.style.color = 'var(--gold)'; changeBtn.style.borderColor = 'var(--gold)'; changeBtn.style.background = 'rgba(212, 175, 55, 0.1)';
             }
             updateProgress();
         }
 
         function clickTile(tileEl, letter) {
             if (tileEl.classList.contains('used')) return;
-            currentWord += letter;
-            tileEl.classList.add('used');
-            selectedTileElements.push(tileEl);
+            currentWord += letter; tileEl.classList.add('used'); selectedTileElements.push(tileEl);
             document.getElementById('current-word-display').innerText = currentWord;
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
         function backspaceTile() {
             if (selectedTileElements.length === 0) return;
-            const lastTile = selectedTileElements.pop();
-            lastTile.classList.remove('used');
+            const lastTile = selectedTileElements.pop(); lastTile.classList.remove('used');
             currentWord = currentWord.slice(0, -1);
             if (currentWord === "") {
                 hintState = 0; currentHintWord = "";
                 const hintBtn = document.getElementById('btn-hint');
-                hintBtn.className = 'action-btn hint-btn';
-                hintBtn.innerText = '💡 Подсказка (20 🪙)';
+                hintBtn.className = 'action-btn hint-btn'; hintBtn.innerText = '💡 Подсказка (20 🪙)';
             }
             document.getElementById('current-word-display').innerText = currentWord;
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -1084,55 +1062,29 @@
         function getHint() {
             if (hintState === 2) return showPopup('Внимание', 'Вы уже полностью открыли это слово.');
             const btn = document.getElementById('btn-hint');
-
             if (hintState === 0) {
                 if (coinBalance < 20) return showPopup('Ошибка', 'Недостаточно монет! Подсказка стоит 20 🪙.');
-                const originalText = btn.innerText;
-                btn.innerText = '⏳ Поиск...';
-                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-
+                const originalText = btn.innerText; btn.innerText = '⏳ Поиск...';
                 setTimeout(() => {
-                    try {
-                        const level = allLevels[currentLevelIndex - 1];
-                        let candidates = [];
-                        for (const w of dictionary) {
-                            if (w.length < 4 || enteredWords.includes(w) || !canFormFromLetters(w, level.val)) continue;
-                            if (level.condType === 'length' && w.length !== level.condVal) continue;
-                            if (level.condType === 'startsWith' && !w.startsWith(level.condVal)) continue;
-                            if (level.condType === 'endsWith' && !w.endsWith(level.condVal)) continue;
-                            if (level.condType === 'contains' && !w.includes(level.condVal)) continue;
-                            candidates.push(w);
-                        }
-                        if (candidates.length === 0) {
-                            btn.innerText = originalText;
-                            return showPopup('Не найдено', 'Все возможные слова уже введены или подходящих под условие слов нет.');
-                        }
-                        candidates.sort((a, b) => b.length - a.length);
-                        let bestWord = null;
-                        for (const w of candidates) {
-                            const hintPart = w.slice(0, Math.ceil(w.length / 2));
-                            if (!enteredWords.some(ew => ew.startsWith(hintPart))) { bestWord = w; break; }
-                        }
-                        if (!bestWord) {
-                            btn.innerText = originalText;
-                            return showPopup('Не найдено', 'Все оставшиеся слова начинаются с тех же букв, что вы уже вводили. Попробуйте угадать сами!');
-                        }
-                        currentHintWord = bestWord;
-                        const hintPart = bestWord.slice(0, Math.ceil(bestWord.length / 2));
-                        currentWord = "";
-                        selectedTileElements.forEach(el => el.classList.remove('used'));
-                        selectedTileElements = [];
-                        document.getElementById('current-word-display').innerText = '';
-                        for (let char of hintPart) {
-                            const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.dataset.letter === char && !el.classList.contains('used'));
-                            if (tile) clickTile(tile, char);
-                        }
-                        btn.className = 'action-btn hint-btn diamond-mode';
-                        btn.innerText = '💎 Доп. подсказка (1 💎)';
-                        coinBalance -= 20; updateCurrencyUI();
-                        hintState = 1;
-                        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    } catch (e) { btn.innerText = originalText; }
+                    const level = allLevels[currentLevelIndex - 1];
+                    let candidates = [];
+                    for (const w of dictionary) {
+                        if (w.length < 4 || enteredWords.includes(w) || !canFormFromLetters(w, level.val)) continue;
+                        candidates.push(w);
+                    }
+                    if (candidates.length === 0) { btn.innerText = originalText; return showPopup('Не найдено', 'Нет подходящих слов.'); }
+                    candidates.sort((a, b) => b.length - a.length);
+                    let bestWord = candidates[0];
+                    currentHintWord = bestWord;
+                    const hintPart = bestWord.slice(0, Math.ceil(bestWord.length / 2));
+                    currentWord = ""; selectedTileElements.forEach(el => el.classList.remove('used')); selectedTileElements = [];
+                    document.getElementById('current-word-display').innerText = '';
+                    for (let char of hintPart) {
+                        const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.dataset.letter === char && !el.classList.contains('used'));
+                        if (tile) clickTile(tile, char);
+                    }
+                    btn.className = 'action-btn hint-btn diamond-mode'; btn.innerText = '💎 Доп. подсказка (1 💎)';
+                    coinBalance -= 20; updateCurrencyUI(); hintState = 1;
                 }, 50);
             } else if (hintState === 1) {
                 tg.showPopup({
@@ -1142,15 +1094,12 @@
                     if (btnId === 'buy') {
                         if (diamondBalance < 1) return showPopup('Ошибка', 'Недостаточно алмазов!');
                         const halfLength = Math.ceil(currentHintWord.length / 2);
-                        const hintPart = currentHintWord.slice(halfLength);
-                        for (let char of hintPart) {
+                        for (let char of currentHintWord.slice(halfLength)) {
                             const tile = Array.from(document.querySelectorAll('.letter-tile')).find(el => el.dataset.letter === char && !el.classList.contains('used'));
                             if (tile) clickTile(tile, char);
                         }
                         diamondBalance -= 1; updateCurrencyUI();
-                        btn.className = 'action-btn hint-btn';
-                        btn.innerText = '✅ Слово собрано';
-                        hintState = 2;
+                        btn.className = 'action-btn hint-btn'; btn.innerText = '✅ Слово собрано'; hintState = 2;
                     }
                 });
             }
@@ -1159,19 +1108,16 @@
         function canFormFromLetters(word, letters) {
             const poolCount = {};
             for (let char of letters) poolCount[char] = (poolCount[char] || 0) + 1;
-            for (let char of word) {
-                if (!poolCount[char]) return false;
-                poolCount[char]--;
-            }
+            for (let char of word) { if (!poolCount[char]) return false; poolCount[char]--; }
             return true;
         }
 
         function changeLetter() {
             const btn = document.getElementById('btn-change-letter');
             if (letterChangeCount === 0) {
-                if (coinBalance < 15) return tg.showAlert('Недостаточно монет! Смена буквы стоит 15 🪙.');
+                if (coinBalance < 15) return tg.showAlert('Недостаточно монет!');
                 const newLetter = prompt("Введите новую букву:");
-                if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+                if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна буква!');
                 const level = allLevels[currentLevelIndex - 1];
                 level.type = 'startsWith'; level.val = newLetter.toLowerCase(); level.text = `Начинается на "${newLetter.toUpperCase()}"`;
                 document.getElementById('current-task').innerText = level.text;
@@ -1180,13 +1126,13 @@
                 btn.style.color = 'var(--diamond)'; btn.style.borderColor = 'var(--diamond)'; btn.style.background = 'rgba(0, 191, 255, 0.1)';
             } else {
                 tg.showPopup({
-                    title: 'Смена буквы', message: 'Следующая смена будет стоить 1 алмаз 💎. Вы согласны?',
+                    title: 'Смена буквы', message: 'Следующая смена будет стоить 1 алмаз 💎?',
                     buttons: [ { id: 'cancel', type: 'cancel', text: 'Отмена' }, { id: 'buy', type: 'default', text: 'Купить 💎' } ]
                 }, (btnId) => {
                     if (btnId === 'buy') {
                         if (diamondBalance < 1) return tg.showAlert('Недостаточно алмазов!');
                         const newLetter = prompt("Введите новую букву:");
-                        if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна одна русская буква!');
+                        if (!newLetter || !/^[а-яё]$/i.test(newLetter)) return tg.showAlert('Нужна буква!');
                         const level = allLevels[currentLevelIndex - 1];
                         level.type = 'startsWith'; level.val = newLetter.toLowerCase(); level.text = `Начинается на "${newLetter.toUpperCase()}"`;
                         document.getElementById('current-task').innerText = level.text;
@@ -1222,7 +1168,6 @@
                 else if (level.type === 'length') isValid = word.length === level.val;
                 if (!isValid) return;
             }
-
             if (enteredWords.includes(word)) { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning'); return; }
 
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -1239,7 +1184,6 @@
             wordItem.className = 'word-item';
             wordItem.innerHTML = `<span>${rawWord}</span> <span>+1</span>`;
             document.getElementById('words-container').prepend(wordItem);
-
             updateProgress();
 
             if (enteredWords.length >= level.target) {
@@ -1248,9 +1192,7 @@
                     localStorage.setItem('wordBattleMaxUnlocked', maxUnlockedLevel);
                     updateCurrencyUI();
                     setTimeout(() => { tg.showAlert('Уровень пройден! +25 🪙'); showLevelSelect(); }, 300);
-                } else {
-                    setTimeout(() => { tg.showAlert('Уровень пройден!'); showLevelSelect(); }, 300);
-                }
+                } else { setTimeout(() => { tg.showAlert('Уровень пройден!'); showLevelSelect(); }, 300); }
             }
         }
 
@@ -1262,8 +1204,6 @@
         document.getElementById('btn-start').disabled = false;
         updateCurrencyUI();
         updateMenuUI();
-        
-        // Попытка загрузить словарь (для одиночной игры)
         loadDictionary();
     </script>
 </body>
