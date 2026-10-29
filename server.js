@@ -8,19 +8,20 @@ const zlib = require('zlib');
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // Важно для обработки JSON от Telegram
+app.use(express.json()); // Критически важно для парсинга JSON от Telegram
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
 // --- БАЗА ДАННЫХ В ПАМЯТИ ---
-// (При перезапуске сервера на бесплатном тарифе Render всё сбросится)
 const playersDB = {}; 
 const queue = []; 
 const rooms = {};
 
-// --- ТОКЕН БОТА (лучше заменить на новый после Revoke Token) ---
-const BOT_TOKEN = process.env.BOT_TOKEN || '9111851129:AAExfzfOGxHWdPkonwMcJtiy3HRjrzdI5D8'; 
+// --- ТОКЕН БОТА ---
+// Токен будет браться из переменной окружения на Render (Environment)
+const BOT_TOKEN = process.env.BOT_TOKEN; 
+if (!BOT_TOKEN) console.warn('⚠️ ВНИМАНИЕ: BOT_TOKEN не задан в переменных окружения!');
 
 // --- ЗАГРУЗКА СЛОВАРЯ ---
 let DICTIONARY = new Set();
@@ -61,7 +62,9 @@ function generateTask() {
     return { conditionType, conditionVal, text };
 }
 
-// --- API ДЛЯ ОПЛАТЫ ---
+// ==========================================
+// API ДЛЯ ОПЛАТЫ (TELEGRAM STARS)
+// ==========================================
 
 // 1. Создание ссылки на оплату
 app.post('/create-invoice', async (req, res) => {
@@ -83,30 +86,46 @@ app.post('/create-invoice', async (req, res) => {
                 description: 'Покупка валюты в игре Word Battle',
                 payload: JSON.stringify({ userId, packageId }),
                 provider_token: '', // Пустая строка для цифровых товаров
-                currency: 'XTR',   // XTR = Telegram Stars
+                currency: 'XTR',    // XTR = Telegram Stars
                 prices: [{ label: title, amount: amount }]
             })
         });
         const data = await response.json();
-        if (data.ok) res.json({ invoiceLink: data.result });
-        else res.status(500).json({ error: data.description });
+        
+        if (data.ok) {
+            console.log(`✅ Счет создан для ${userId} (${packageId})`);
+            res.json({ invoiceLink: data.result });
+        } else {
+            console.error('❌ Ошибка создания счета:', data);
+            res.status(500).json({ error: data.description });
+        }
     } catch (e) {
         console.error(e);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({ error: 'Ошибка сервера при создании счета' });
     }
 });
 
 // 2. Вебхук для Telegram (Оплата)
 app.post('/webhook', async (req, res) => {
     const update = req.body;
+    console.log('📩 Получено обновление от Telegram:', JSON.stringify(update));
 
-    // Подтверждаем готовность принять платеж
+    // ОЧЕНЬ ВАЖНО: Подтверждаем готовность принять платеж за 10 секунд!
     if (update.pre_checkout_query) {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerPreCheckoutQuery`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pre_checkout_query_id: update.pre_checkout_query.id, ok: true })
-        });
+        console.log('🔔 Pre-checkout запрос. Подтверждаем...');
+        try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerPreCheckoutQuery`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pre_checkout_query_id: update.pre_checkout_query.id,
+                    ok: true 
+                })
+            });
+            console.log('✅ Pre-checkout подтвержден.');
+        } catch (e) {
+            console.error('❌ Ошибка при подтверждении pre-checkout:', e);
+        }
     }
 
     // Успешная оплата
@@ -116,7 +135,7 @@ app.post('/webhook', async (req, res) => {
         const userId = payload.userId;
         const packageId = payload.packageId;
 
-        console.log(`✅ Оплата прошла! Игрок: ${userId}, Пакет: ${packageId}`);
+        console.log(`💰 ОПЛАТА ПРОШЛА! Игрок: ${userId}, Пакет: ${packageId}`);
 
         // Начисляем валюту
         if (playersDB[userId]) {
@@ -124,11 +143,15 @@ app.post('/webhook', async (req, res) => {
             else if (packageId === 'medium') { playersDB[userId].coins += 150; playersDB[userId].diamonds += 10; }
             else if (packageId === 'large') { playersDB[userId].coins += 400; playersDB[userId].diamonds += 50; }
             
+            console.log(`🎁 Начислено. Новый баланс:`, playersDB[userId]);
+
             // Уведомляем клиент (если он онлайн)
             io.emit(`payment_success_${userId}`, { 
                 coins: playersDB[userId].coins, 
                 diamonds: playersDB[userId].diamonds 
             });
+        } else {
+            console.log(`⚠️ Игрок ${userId} не найден в базе (возможно, перезапуск сервера).`);
         }
     }
     res.sendStatus(200);
