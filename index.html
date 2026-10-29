@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Word War</title>
+    <title>Word Battle</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
@@ -1016,12 +1016,12 @@
             if (!code || code === '...') return;
             
             // Ссылка на вашего бота
-            const botUsername = 'WordWarGame'; 
+            const botUsername = 'WordWarGameBot'; 
             
             // Создаем Deep Link, который сразу откроет игру с кодом
             const gameLink = `https://t.me/${botUsername}?startapp=${code}`;
             
-            const text = `Привет! Сыграем в Word War? Нажми на ссылку ниже, чтобы сразу присоединиться:`;
+            const text = `Привет! Сыграем в Word Battle? Нажми на ссылку ниже, чтобы сразу присоединиться:`;
             
             // Формируем ссылку для шаринга
             const url = `https://t.me/share/url?url=${encodeURIComponent(gameLink)}&text=${encodeURIComponent(text)}`;
@@ -1516,15 +1516,17 @@
         document.getElementById('pvp-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') submitPvPWord(); });
 
         // --- ОБРАБОТКА DEEP LINK (startapp) ---
-        if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
-            const inviteCode = tg.initDataUnsafe.start_param;
-            if (inviteCode.length === 6) {
+        function checkDeepLink() {
+            const startParam = tg.initDataUnsafe?.start_param;
+            if (startParam && startParam.length === 6) {
                 setTimeout(() => {
                     switchScreen('screen-friend-menu');
-                    document.getElementById('friend-code-input').value = inviteCode.toUpperCase();
-                }, 1000);
+                    document.getElementById('friend-code-input').value = startParam.toUpperCase();
+                    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                }, 500);
             }
         }
+        checkDeepLink();
 
         document.getElementById('loading-screen').style.display = 'none'; 
         document.getElementById('btn-start').disabled = false;
