@@ -36,7 +36,7 @@ async function connectDB() {
         db = client.db('wordbattle');
         playersCollection = db.collection('players');
         
-        // Загружаем всех игроков в память при старте
+        // Загружаем всех игроков в память при старте (для быстрого доступа)
         const allPlayers = await playersCollection.find({}).toArray();
         allPlayers.forEach(p => { playersDB[p.id] = p; });
         console.log(`✅ УСПЕХ: Загружено игроков из БД: ${allPlayers.length}`);
@@ -153,7 +153,7 @@ app.post('/webhook', (req, res) => {
             else if (packageId === 'medium') { playersDB[userId].coins += 150; playersDB[userId].diamonds += 10; }
             else if (packageId === 'large') { playersDB[userId].coins += 400; playersDB[userId].diamonds += 50; }
             
-            savePlayer(userId); // Сохраняем в БД
+            savePlayer(userId);
             io.emit(`payment_success_${userId}`, { coins: playersDB[userId].coins, diamonds: playersDB[userId].diamonds });
         }
     }
@@ -170,7 +170,7 @@ io.on('connection', (socket) => {
                     playersDB[data.id] = existing;
                 } else {
                     playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
-                    savePlayer(data.id); // Сохраняем нового игрока
+                    savePlayer(data.id);
                 }
             } else {
                 playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
@@ -208,7 +208,7 @@ io.on('connection', (socket) => {
         if (!room || room.state !== 'pending') return;
         if (playersDB[socket.userId]) {
             playersDB[socket.userId].rating -= 15;
-            savePlayer(socket.userId); // Сохраняем штраф
+            savePlayer(socket.userId);
         }
         const opponentId = socket.id === room.p1 ? room.p2 : room.p1;
         const opponentSocket = io.sockets.sockets.get(opponentId);
@@ -250,6 +250,19 @@ io.on('connection', (socket) => {
         io.to(room.id).emit('ability_used', { by: socket.id, type });
         io.to(room.id).emit('score_update', { p1Score: room.players[room.p1].score, p2Score: room.players[room.p2].score });
         io.to(room.id).emit('timer_update', room.timeLeft);
+    });
+
+    // --- ПОЛУЧЕНИЕ РЕЙТИНГА (ЛИДЕРБОРД) ---
+    socket.on('get_leaderboard', async () => {
+        if (playersCollection) {
+            // Берем топ-100 игроков из БД, сортируем по рейтингу
+            const players = await playersCollection.find({}).sort({ rating: -1 }).limit(100).toArray();
+            socket.emit('leaderboard_data', players);
+        } else {
+            // Если БД нет, отдаем тех, кто в кэше
+            const players = Object.values(playersDB).sort((a, b) => b.rating - a.rating).slice(0, 100);
+            socket.emit('leaderboard_data', players);
+        }
     });
 
     socket.on('disconnect', () => {
@@ -345,11 +358,11 @@ function endRound(roomId) {
         
         if (winnerSocket && playersDB[winnerSocket.userId]) {
             playersDB[winnerSocket.userId].rating += 25;
-            savePlayer(winnerSocket.userId); // Сохраняем рейтинг победителя
+            savePlayer(winnerSocket.userId);
         }
         if (loserSocket && playersDB[loserSocket.userId]) {
             playersDB[loserSocket.userId].rating -= 15;
-            savePlayer(loserSocket.userId); // Сохраняем рейтинг проигравшего
+            savePlayer(loserSocket.userId);
         }
         
         io.to(roomId).emit('game_over', { winnerId: winner, loserId: loser });
