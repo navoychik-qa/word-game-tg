@@ -342,7 +342,11 @@
     <div class="modal-overlay" id="accept-match-modal">
         <div class="modal-content">
             <div class="modal-title">Соперник найден!</div>
-            <div style="font-size: 18px; margin-bottom: 20px;">Принять бой?</div>
+            <div style="font-size: 18px; margin-bottom: 10px;">Принять бой?</div>
+            <!-- НОВЫЙ БЛОК ДЛЯ ТАЙМЕРА -->
+            <div style="font-size: 24px; font-weight: bold; color: var(--gold); margin-bottom: 20px;">
+                <span id="accept-timer">10</span> сек
+            </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="declineMatch()">Отклонить (-15 рейтинга)</button>
                 <button class="modal-btn confirm" onclick="acceptMatch()">Принять</button>
@@ -543,7 +547,7 @@
         const SERVER_URL = 'https://word-game-tg.onrender.com'; 
         
         let socket = null;
-        let pvp = { active: false, isSearching: false, roomId: null, isAccepted: false };
+        let pvp = { active: false, isSearching: false, roomId: null, isAccepted: false, acceptTimerInterval: null };
 
         let dictionary = new Set();
         let maxUnlockedLevel = parseInt(localStorage.getItem('wordBattleMaxUnlocked') || '1');
@@ -599,24 +603,42 @@
                 pvp.isSearching = true;
             });
 
-            // ПРИНЯТИЕ ИГРЫ
             socket.on('match_found_pending', (data) => {
                 document.getElementById('pvp-search-overlay').classList.remove('active');
                 pvp.roomId = data.roomId;
                 pvp.isAccepted = false;
                 document.getElementById('enemy-name').innerText = data.p2Data.name;
                 document.getElementById('my-name').innerText = data.p1Data.name;
+                
                 document.getElementById('accept-match-modal').classList.add('active');
+                
+                // ТАЙМЕР
+                let timeLeft = 10;
+                const timerEl = document.getElementById('accept-timer');
+                if (timerEl) timerEl.innerText = timeLeft;
+                
+                if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
+                pvp.acceptTimerInterval = setInterval(() => {
+                    timeLeft--;
+                    if (timerEl) timerEl.innerText = timeLeft;
+                    if (timeLeft <= 0) {
+                        clearInterval(pvp.acceptTimerInterval);
+                        document.getElementById('accept-match-modal').classList.remove('active');
+                    }
+                }, 1000);
+
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
             });
 
             socket.on('waiting_for_opponent', () => {
                 pvp.isAccepted = true;
+                if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showPopup('Ожидание', 'Вы приняли бой. Ждем соперника...');
             });
 
             socket.on('opponent_declined', (msg) => {
+                if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showPopup('Соперник сбежал', msg);
                 pvp.active = false;
@@ -624,13 +646,13 @@
             });
 
             socket.on('match_timeout', (msg) => {
+                if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
                 document.getElementById('accept-match-modal').classList.remove('active');
                 showPopup('Таймаут', msg);
                 pvp.active = false;
                 goToMenu();
             });
 
-            // ОТСЧЕТ 3-2-1
             socket.on('countdown_start', (num) => {
                 pvp.active = true;
                 const overlay = document.getElementById('pvp-countdown-overlay');
@@ -648,7 +670,6 @@
                 document.getElementById('pvp-countdown-overlay').style.display = 'none';
             });
 
-            // СТАРТ РАУНДА
             socket.on('round_start', (data) => {
                 document.getElementById('pvp-timer').innerText = data.time;
                 document.getElementById('pvp-timer').classList.remove('danger');
@@ -723,11 +744,13 @@
         }
 
         function acceptMatch() {
+            if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
             socket.emit('accept_game');
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         }
 
         function declineMatch() {
+            if (pvp.acceptTimerInterval) clearInterval(pvp.acceptTimerInterval);
             document.getElementById('accept-match-modal').classList.remove('active');
             socket.emit('decline_game');
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
@@ -801,38 +824,24 @@
         }
         function closeCurrencyModal() { document.getElementById('currency-modal').classList.remove('active'); }
         
-        // --- РЕАЛЬНАЯ ПОКУПКА ЧЕРЕЗ TELEGRAM STARS ---
         async function buyPackage(id, stars, coins, diamonds) {
             const userId = tg.initDataUnsafe?.user?.id;
             if (!userId) return showPopup('Ошибка', 'Не удалось определить пользователя Telegram.');
-
             closeCurrencyModal();
-
             try {
-                // Запрашиваем ссылку на оплату у нашего сервера
                 const response = await fetch(`${SERVER_URL}/create-invoice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, packageId: id })
                 });
-                
                 const data = await response.json();
                 if (data.error) return showPopup('Ошибка', data.error);
-
-                // Открываем окно оплаты Telegram
                 tg.openInvoice(data.invoiceLink, (status) => {
-                    if (status === 'paid') {
-                        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    } else if (status === 'cancelled') {
-                        showPopup('Отмена', 'Вы отменили покупку.');
-                    } else if (status === 'failed') {
-                        showPopup('Ошибка', 'Платеж не прошел.');
-                    }
+                    if (status === 'paid') { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); }
+                    else if (status === 'cancelled') { showPopup('Отмена', 'Вы отменили покупку.'); }
+                    else if (status === 'failed') { showPopup('Ошибка', 'Платеж не прошел.'); }
                 });
-            } catch (e) {
-                console.error(e);
-                showPopup('Ошибка', 'Не удалось создать счет. Попробуйте позже.');
-            }
+            } catch (e) { showPopup('Ошибка', 'Не удалось создать счет.'); }
         }
 
         function buyCoinsWithDiamonds() {
@@ -888,12 +897,10 @@
         }
         initTheme();
 
-        // --- ЗАГРУЗКА СЛОВАРЯ ---
         async function loadDictionary() {
             try {
                 const response = await fetch('words.txt.gz?v=' + Date.now());
                 if (!response.ok) throw new Error('Файл не найден');
-                
                 let text;
                 if (typeof DecompressionStream !== 'undefined') {
                     const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
@@ -903,7 +910,6 @@
                     text = pako.inflate(new Uint8Array(buffer), { to: 'string' });
                 }
                 dictionary = new Set(text.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length > 1));
-
                 generateLevels();
                 document.getElementById('loading-screen').style.display = 'none';
                 document.getElementById('btn-start').disabled = false;
@@ -911,7 +917,6 @@
                 updateMenuUI();
             } catch (error) {
                 document.getElementById('loading-text').innerText = 'Ошибка словаря';
-                console.error(error);
             }
         }
 
@@ -939,7 +944,6 @@
                 }
                 allLevels.push({ type, val, text, target });
             }
-            // Глава 2
             const vowels = 'аеиоуыэюя'; const consonants = 'бвгджзклмнпрстфхцчшщ';
             const wordsArray = Array.from(dictionary);
             for (let i = 51; i <= 100; i++) {
@@ -954,7 +958,6 @@
             }
         }
 
-        // --- ОДИНОЧНАЯ ИГРА ---
         function switchChapter(chapter) {
             currentChapterView = chapter;
             document.getElementById('tab-ch1').classList.toggle('active', chapter === 1);
