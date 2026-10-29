@@ -5,20 +5,62 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // Критически важно для Telegram Webhook
+app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
-// --- БАЗА ДАННЫХ В ПАМЯТИ ---
+// --- БАЗА ДАННЫХ ---
 const playersDB = {}; 
 const queue = []; 
 const rooms = {};
 
-// --- ТОКЕН БОТА (берется из переменных Render) ---
+// --- ПОДКЛЮЧЕНИЕ К MONGODB ---
+const MONGODB_URI = process.env.MONGODB_URI;
+let db, playersCollection;
+
+async function connectDB() {
+    if (!MONGODB_URI) {
+        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Переменная MONGODB_URI не задана в Render!');
+        return;
+    }
+    
+    console.log('⏳ Попытка подключения к MongoDB...');
+    try {
+        const client = new MongoClient(MONGODB_URI);
+        await client.connect();
+        db = client.db('wordbattle');
+        playersCollection = db.collection('players');
+        
+        // Загружаем всех игроков в память при старте
+        const allPlayers = await playersCollection.find({}).toArray();
+        allPlayers.forEach(p => { playersDB[p.id] = p; });
+        console.log(`✅ УСПЕХ: Загружено игроков из БД: ${allPlayers.length}`);
+    } catch (e) {
+        console.error('❌ ОШИБКА ПОДКЛЮЧЕНИЯ К БД:', e.message);
+    }
+}
+connectDB();
+
+// Функция для сохранения/обновления игрока в БД
+async function savePlayer(userId) {
+    if (!playersCollection || !playersDB[userId]) return;
+    try {
+        await playersCollection.updateOne(
+            { id: userId },
+            { $set: playersDB[userId] },
+            { upsert: true }
+        );
+    } catch (e) {
+        console.error('Ошибка сохранения игрока:', e);
+    }
+}
+
+// --- ТОКЕН БОТА ---
 const BOT_TOKEN = process.env.BOT_TOKEN; 
 if (!BOT_TOKEN) console.warn('⚠️ BOT_TOKEN не задан!');
 
@@ -41,7 +83,6 @@ try {
 const letters = 'абвгдежзиклмнопрстуфхцчшщэюя';
 const vowels = 'аеиоуыэюя';
 const consonants = 'бвгджзклмнпрстфхцчшщ';
-
 function generateTask() {
     const type = Math.floor(Math.random() * 3);
     let text = '', conditionType = '', conditionVal = '';
@@ -59,13 +100,12 @@ function generateTask() {
 }
 
 // ==========================================
-// API ДЛЯ ОПЛАТЫ (TELEGRAM STARS)
+// API ДЛЯ ОПЛАТЫ
 // ==========================================
 
 app.post('/create-invoice', async (req, res) => {
     if (!BOT_TOKEN) return res.status(500).json({ error: 'Бот не настроен' });
     const { userId, packageId } = req.body;
-
     let amount = 0, title = '';
     if (packageId === 'small') { amount = 10; title = '50 Монет'; }
     else if (packageId === 'medium') { amount = 25; title = '150 Монет + 10 Алмазов'; }
@@ -77,40 +117,29 @@ app.post('/create-invoice', async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                title: title,
-                description: 'Покупка валюты в игре Word Battle',
+                title, description: 'Покупка валюты в игре Word Battle',
                 payload: JSON.stringify({ userId, packageId }),
-                provider_token: '', // Пусто для Stars
-                currency: 'XTR',    // Telegram Stars
+                provider_token: '', currency: 'XTR',
                 prices: [{ label: title, amount: amount }]
             })
         });
         const data = await response.json();
-        if (data.ok) {
-            console.log(`✅ Счет создан для ${userId} (${packageId})`);
-            res.json({ invoiceLink: data.result });
-        } else {
-            res.status(500).json({ error: data.description });
-        }
+        if (data.ok) res.json({ invoiceLink: data.result });
+        else res.status(500).json({ error: data.description });
     } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// --- ОПТИМИЗИРОВАННЫЙ ВЕБХУК ---
 app.post('/webhook', (req, res) => {
     const update = req.body;
-
-    // 1. МГНОВЕННО подтверждаем оплату
     if (update.pre_checkout_query) {
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerPreCheckoutQuery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pre_checkout_query_id: update.pre_checkout_query.id, ok: true })
-        }).catch(e => console.error('Ошибка подтверждения:', e));
-        
-        return res.sendStatus(200); // Сразу отвечаем Telegram
+        }).catch(err => console.error(err));
+        return res.sendStatus(200);
     }
 
-    // 2. Начисляем валюту после успешной оплаты
     if (update.message && update.message.successful_payment) {
         const payment = update.message.successful_payment;
         const payload = JSON.parse(payment.invoice_payload);
@@ -124,10 +153,8 @@ app.post('/webhook', (req, res) => {
             else if (packageId === 'medium') { playersDB[userId].coins += 150; playersDB[userId].diamonds += 10; }
             else if (packageId === 'large') { playersDB[userId].coins += 400; playersDB[userId].diamonds += 50; }
             
-            io.emit(`payment_success_${userId}`, { 
-                coins: playersDB[userId].coins, 
-                diamonds: playersDB[userId].diamonds 
-            });
+            savePlayer(userId); // Сохраняем в БД
+            io.emit(`payment_success_${userId}`, { coins: playersDB[userId].coins, diamonds: playersDB[userId].diamonds });
         }
     }
     res.sendStatus(200);
@@ -135,9 +162,19 @@ app.post('/webhook', (req, res) => {
 
 // --- ИГРОВАЯ ЛОГИКА ---
 io.on('connection', (socket) => {
-    socket.on('auth', (data) => {
+    socket.on('auth', async (data) => {
         if (!playersDB[data.id]) {
-            playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
+            if (playersCollection) {
+                const existing = await playersCollection.findOne({ id: data.id });
+                if (existing) {
+                    playersDB[data.id] = existing;
+                } else {
+                    playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
+                    savePlayer(data.id); // Сохраняем нового игрока
+                }
+            } else {
+                playersDB[data.id] = { id: data.id, name: data.name || 'Игрок', rating: 1000, coins: 50, diamonds: 0 };
+            }
         }
         socket.userId = data.id;
         socket.emit('auth_success', playersDB[data.id]);
@@ -147,10 +184,7 @@ io.on('connection', (socket) => {
         if (queue.includes(socket)) return;
         queue.push(socket);
         socket.emit('searching');
-        if (queue.length >= 2) {
-            const p1 = queue.shift(); const p2 = queue.shift();
-            createPendingRoom(p1, p2);
-        }
+        if (queue.length >= 2) { const p1 = queue.shift(); const p2 = queue.shift(); createPendingRoom(p1, p2); }
     });
 
     socket.on('cancel_search', () => {
@@ -172,13 +206,13 @@ io.on('connection', (socket) => {
     socket.on('decline_game', () => {
         const room = rooms[socket.roomId];
         if (!room || room.state !== 'pending') return;
-        if (playersDB[socket.userId]) playersDB[socket.userId].rating -= 15;
+        if (playersDB[socket.userId]) {
+            playersDB[socket.userId].rating -= 15;
+            savePlayer(socket.userId); // Сохраняем штраф
+        }
         const opponentId = socket.id === room.p1 ? room.p2 : room.p1;
         const opponentSocket = io.sockets.sockets.get(opponentId);
-        if (opponentSocket) {
-            opponentSocket.emit('opponent_declined', 'Соперник отклонил игру.');
-            opponentSocket.roomId = null;
-        }
+        if (opponentSocket) { opponentSocket.emit('opponent_declined', 'Соперник отклонил игру.'); opponentSocket.roomId = null; }
         delete rooms[room.id];
     });
 
@@ -247,8 +281,8 @@ function createPendingRoom(p1, p2) {
         const p2Accepted = room.accepted[room.p2];
         const p1Socket = io.sockets.sockets.get(room.p1);
         const p2Socket = io.sockets.sockets.get(room.p2);
-        if (!p1Accepted && playersDB[p1Socket.userId]) playersDB[p1Socket.userId].rating -= 15;
-        if (!p2Accepted && playersDB[p2Socket.userId]) playersDB[p2Socket.userId].rating -= 15;
+        if (!p1Accepted && playersDB[p1Socket.userId]) { playersDB[p1Socket.userId].rating -= 15; savePlayer(p1Socket.userId); }
+        if (!p2Accepted && playersDB[p2Socket.userId]) { playersDB[p2Socket.userId].rating -= 15; savePlayer(p2Socket.userId); }
         io.to(roomId).emit('match_timeout', 'Вы не успели принять игру.');
         delete rooms[roomId];
     }, 10000);
@@ -308,8 +342,16 @@ function endRound(roomId) {
         const loser = room.players[room.p1].lives > 0 ? room.p2 : room.p1;
         const winnerSocket = io.sockets.sockets.get(winner);
         const loserSocket = io.sockets.sockets.get(loser);
-        if (winnerSocket && playersDB[winnerSocket.userId]) playersDB[winnerSocket.userId].rating += 25;
-        if (loserSocket && playersDB[loserSocket.userId]) playersDB[loserSocket.userId].rating -= 15;
+        
+        if (winnerSocket && playersDB[winnerSocket.userId]) {
+            playersDB[winnerSocket.userId].rating += 25;
+            savePlayer(winnerSocket.userId); // Сохраняем рейтинг победителя
+        }
+        if (loserSocket && playersDB[loserSocket.userId]) {
+            playersDB[loserSocket.userId].rating -= 15;
+            savePlayer(loserSocket.userId); // Сохраняем рейтинг проигравшего
+        }
+        
         io.to(roomId).emit('game_over', { winnerId: winner, loserId: loser });
         delete rooms[roomId];
     } else {
